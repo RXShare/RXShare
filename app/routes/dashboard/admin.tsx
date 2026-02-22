@@ -3,7 +3,7 @@ import { useLoaderData, useOutletContext, useRevalidator } from "react-router";
 import { getSession } from "~/.server/session";
 import { isAdmin } from "~/.server/auth";
 import { query, queryOne } from "~/.server/db";
-import { formatFileSize, getGravatarUrl } from "~/lib/utils-format";
+import { formatFileSize, getAvatarUrl } from "~/lib/utils-format";
 import { cn } from "~/lib/utils";
 import { useToast } from "~/components/ui/use-toast";
 import { Icon } from "~/components/Icon";
@@ -170,7 +170,7 @@ function UsersTab({ users, allUploads, currentUserId, toast, revalidator }: any)
                       <div className="relative">
                         <div className={cn("w-10 h-10 rounded-full p-0.5", u.is_admin === 1 ? "bg-gradient-to-br from-primary to-[var(--primary-hover)]" : "bg-gray-800")}>
                           <div className="w-full h-full rounded-full bg-black flex items-center justify-center overflow-hidden">
-                            <img alt="" className="w-full h-full object-cover opacity-90" src={getGravatarUrl(u.email)} />
+                            <img alt="" className="w-full h-full object-cover opacity-90" src={getAvatarUrl(u.username || u.email)} />
                           </div>
                         </div>
                         <div className={cn("absolute -bottom-0.5 -right-0.5 w-3 h-3 rounded-full border-2 border-[#141414]",

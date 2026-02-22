@@ -1,7 +1,7 @@
 import { useEffect, useRef } from "react";
 import { useNavigate, useLocation } from "react-router";
 import { Icon } from "~/components/Icon";
-import { getGravatarUrl } from "~/lib/utils-format";
+import { getAvatarUrl } from "~/lib/utils-format";
 import { cn } from "~/lib/utils";
 
 const DEFAULT_LOGO = "https://cdn.rxss.click/rexsystems/logo-transparent.svg";
@@ -104,7 +104,7 @@ export function SidebarLayout({ children, user, systemSettings, isAdmin: admin }
           <div className="flex items-center gap-3">
             <div className="relative">
               <div className="w-10 h-10 rounded-full bg-gray-700 flex items-center justify-center text-white overflow-hidden ring-2 ring-primary/50">
-                <img alt="User" className="w-full h-full object-cover" src={getGravatarUrl(user?.email || "")} />
+                <img alt="User" className="w-full h-full object-cover" src={getAvatarUrl(user?.username || user?.email || "")} />
               </div>
               <div className="absolute bottom-0 right-0 w-3 h-3 bg-green-500 rounded-full border-2 border-[#1a1a1a]" />
             </div>
@@ -167,7 +167,7 @@ export function HeaderLayout({ children, user, systemSettings, isAdmin: admin }:
           <div className="flex items-center gap-3">
             <div className="relative">
               <div className="w-8 h-8 rounded-full overflow-hidden ring-2 ring-primary/50">
-                <img src={getGravatarUrl(user?.email || "")} alt="" className="w-full h-full object-cover" />
+                <img src={getAvatarUrl(user?.username || user?.email || "")} alt="" className="w-full h-full object-cover" />
               </div>
             </div>
             <button onClick={async () => { await fetch("/api/auth/logout", { method: "POST" }); navigate("/auth/login"); }}
@@ -223,7 +223,7 @@ export function FloatingLayout({ children, user, systemSettings, isAdmin: admin 
           <div className="flex items-center gap-2 px-2">
             <div className="relative">
               <div className="w-8 h-8 rounded-full overflow-hidden ring-2 ring-primary/50">
-                <img src={getGravatarUrl(user?.email || "")} alt="" className="w-full h-full object-cover" />
+                <img src={getAvatarUrl(user?.username || user?.email || "")} alt="" className="w-full h-full object-cover" />
               </div>
               <div className="absolute -bottom-0.5 -right-0.5 w-2.5 h-2.5 bg-green-500 rounded-full border-2 border-[#1a1a1a]" />
             </div>

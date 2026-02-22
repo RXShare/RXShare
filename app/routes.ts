@@ -15,6 +15,7 @@ export default [
   route("u/:username", "routes/user-viewer.tsx"),
   route("u/:username/:fileName", "routes/user-viewer.tsx", { id: "user-viewer-file" }),
   // API routes
+  route("api/setup/config", "routes/api/setup.config.tsx"),
   route("api/auth/login", "routes/api/auth.login.tsx"),
   route("api/auth/signup", "routes/api/auth.signup.tsx"),
   route("api/auth/logout", "routes/api/auth.logout.tsx"),

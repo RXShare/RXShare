@@ -1,5 +1,3 @@
-import md5 from "md5";
-
 export function formatFileSize(bytes: number): string {
   if (bytes === 0) return "0 B";
   const k = 1024;
@@ -23,9 +21,8 @@ export function formatRelativeDate(dateStr: string): string {
   return date.toLocaleDateString();
 }
 
-export function getGravatarUrl(email: string, size = 80): string {
-  const hash = md5(email.trim().toLowerCase());
-  return `https://www.gravatar.com/avatar/${hash}?d=identicon&s=${size}`;
+export function getAvatarUrl(seed: string, size = 80): string {
+  return `https://api.dicebear.com/9.x/initials/svg?seed=${encodeURIComponent(seed)}&size=${size}&backgroundColor=1a1a1a&textColor=ffffff`;
 }
 
 export function generateToken(): string {

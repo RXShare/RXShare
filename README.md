@@ -14,7 +14,7 @@ A self-hosted file sharing platform with a modern glassmorphism UI. Upload, mana
 - User profiles with custom URL paths
 - SQLite (default) or MySQL/MariaDB database
 - Local storage (default) or S3-compatible object storage
-- Gravatar avatars
+- Auto-generated avatars
 - Mobile responsive
 
 ## Quick Start
