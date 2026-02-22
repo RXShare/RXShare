@@ -43,7 +43,7 @@ export default function Setup() {
     <div className="min-h-screen flex items-center justify-center p-4 relative">
       <div className="absolute top-0 left-0 w-full h-full bg-grid-pattern opacity-10 pointer-events-none" />
       <div className="animate-in fade-in slide-in-from-bottom-4 duration-500 relative z-10">
-        <div className="glass-card rounded-2xl w-full max-w-md shadow-glow-card overflow-hidden">
+        <div className="glass-card rounded-2xl w-full max-w-lg shadow-glow-card overflow-hidden">
           <div className="p-8 pb-6 text-center relative">
             <div className="absolute inset-0 bg-gradient-to-b from-primary/5 to-transparent pointer-events-none" />
             <div className="relative z-10">
