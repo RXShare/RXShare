@@ -1,0 +1,11 @@
+node_modules/
+dist/
+build/
+.react-router/
+.vscode/
+data/
+*.local
+.DS_Store
+.env
+*.log
+stitch-design-export/
