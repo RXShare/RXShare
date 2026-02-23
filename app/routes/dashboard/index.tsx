@@ -174,16 +174,16 @@ export default function UploadsPage() {
           onDrop={handleDrop}
           onClick={() => fileInputRef.current?.click()}
           className={cn(
-            "rounded-2xl relative overflow-hidden group cursor-pointer border-dashed border-2 transition-colors bg-[#0a0a0a]/50 backdrop-blur-xl",
+            "glass-card rounded-2xl p-1 relative overflow-hidden group cursor-pointer border-dashed border-2 transition-colors",
             dragActive ? "border-primary/50" : "border-white/10 hover:border-primary/50"
           )}
         >
           <div className={cn("absolute inset-0 bg-primary/5 opacity-0 transition-opacity", dragActive && "opacity-100")} />
-          <div className="h-full flex flex-col items-center justify-center text-center p-6 relative z-10">
+          <div className="h-full rounded-xl bg-[#0a0a0a]/50 flex flex-col items-center justify-center text-center p-6 relative z-10">
             {uploading ? (
               <div className="space-y-3">
-                <div className="w-16 h-16 rounded-full bg-primary/20 flex items-center justify-center shadow-glow-primary">
-                  <Icon name="cloud_upload" className="text-3xl text-primary animate-pulse" />
+                <div className="w-16 h-16 rounded-full bg-primary/20 flex items-center justify-center shadow-glow-primary mx-auto">
+                  <Icon name="cloud_upload" className="text-3xl text-primary animate-pulse !leading-none" />
                 </div>
                 <p className="text-sm text-gray-400">Uploading... {Math.round(uploadProgress)}%</p>
                 <div className="h-1.5 w-32 bg-gray-800 rounded-full overflow-hidden mx-auto">
@@ -192,8 +192,8 @@ export default function UploadsPage() {
               </div>
             ) : (
               <>
-                <div className="w-16 h-16 rounded-full bg-white/5 flex items-center justify-center mb-3 group-hover:scale-110 transition-transform group-hover:bg-primary/20 group-hover:shadow-glow-primary">
-                  <Icon name="cloud_upload" className="text-3xl text-gray-400 group-hover:text-primary transition-colors" />
+                <div className="w-16 h-16 rounded-full bg-white/5 flex items-center justify-center mb-3 group-hover:scale-110 transition-transform group-hover:bg-primary/20 group-hover:shadow-glow-primary mx-auto">
+                  <Icon name="cloud_upload" className="text-3xl text-gray-400 group-hover:text-primary transition-colors !leading-none" />
                 </div>
                 <h3 className="font-bold text-white text-lg">Drop files here</h3>
                 <p className="text-sm text-gray-500 mt-1">or click to browse</p>
