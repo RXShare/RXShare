@@ -20,7 +20,17 @@ export async function action({ request, params }: { request: Request; params: { 
     const sets: string[] = [];
     const vals: any[] = [];
     for (const key of allowed) {
-      if (body[key] !== undefined) { sets.push(`${key} = ?`); vals.push(body[key]); }
+      if (body[key] !== undefined) {
+        // Validate types — all must be numbers
+        const val = Number(body[key]);
+        if (!Number.isFinite(val)) continue;
+        // Boolean fields must be 0 or 1
+        if ((key === "is_admin" || key === "is_active") && val !== 0 && val !== 1) continue;
+        // Size fields must be positive
+        if ((key === "disk_quota" || key === "max_upload_size") && val < 0) continue;
+        sets.push(`${key} = ?`);
+        vals.push(val);
+      }
     }
     if (sets.length === 0) return Response.json({ error: "Nothing to update" }, { status: 400 });
     sets.push("updated_at = ?");
