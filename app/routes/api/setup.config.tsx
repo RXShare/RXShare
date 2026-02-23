@@ -2,10 +2,15 @@ import { isFirstRun } from "~/.server/db";
 import { writeFileSync, readFileSync, existsSync } from "fs";
 import { join } from "path";
 import crypto from "crypto";
+import { rateLimit } from "~/.server/rate-limit";
 
 export async function action({ request }: { request: Request }) {
   if (request.method !== "POST") return new Response("Method not allowed", { status: 405 });
   if (!isFirstRun()) return Response.json({ error: "Setup already completed" }, { status: 403 });
+
+  // Rate limit: 5 attempts per 10 minutes
+  const limited = rateLimit("setup", request, 5, 10 * 60 * 1000);
+  if (limited) return limited;
 
   const body = await request.json();
   const { dbType, dbHost, dbPort, dbUser, dbPassword, dbName, storageType, s3Bucket, s3Region, s3AccessKey, s3SecretKey, s3Endpoint } = body;

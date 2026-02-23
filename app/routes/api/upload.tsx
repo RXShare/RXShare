@@ -4,6 +4,8 @@ import { queryOne, execute } from "~/.server/db";
 import { getStorage } from "~/.server/storage";
 import { generateThumbnail, generatePreview } from "~/.server/thumbnails";
 import { getBaseUrl } from "~/.server/base-url";
+import { rateLimit } from "~/.server/rate-limit";
+import { verifyApiToken } from "~/.server/auth";
 
 async function authenticateRequest(request: Request) {
   // Check session cookie first
@@ -13,10 +15,10 @@ async function authenticateRequest(request: Request) {
   const auth = request.headers.get("Authorization");
   if (auth?.startsWith("Bearer ")) {
     const token = auth.slice(7);
-    const apiToken = queryOne<any>("SELECT user_id FROM api_tokens WHERE token = ?", [token]);
-    if (apiToken) {
-      execute("UPDATE api_tokens SET last_used_at = ? WHERE token = ?", [new Date().toISOString(), token]);
-      const user = queryOne<any>("SELECT id, email, username FROM users WHERE id = ?", [apiToken.user_id]);
+    const result = verifyApiToken(token);
+    if (result) {
+      execute("UPDATE api_tokens SET last_used_at = ? WHERE user_id = ?", [new Date().toISOString(), result.user_id]);
+      const user = queryOne<any>("SELECT id, email, username FROM users WHERE id = ?", [result.user_id]);
       return user || null;
     }
   }
@@ -25,6 +27,11 @@ async function authenticateRequest(request: Request) {
 
 export async function action({ request }: { request: Request }) {
   if (request.method !== "POST") return new Response("Method not allowed", { status: 405 });
+
+  // Rate limit: 30 uploads per 10 minutes per IP
+  const limited = rateLimit("upload", request, 30, 10 * 60 * 1000);
+  if (limited) return limited;
+
   const user = await authenticateRequest(request);
   if (!user) return Response.json({ error: "Unauthorized" }, { status: 401 });
 

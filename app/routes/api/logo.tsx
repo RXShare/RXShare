@@ -3,11 +3,16 @@ import { queryOne } from "~/.server/db";
 import { writeFile, mkdir, readFile } from "fs/promises";
 import { existsSync } from "fs";
 import { join, extname } from "path";
+import { rateLimit } from "~/.server/rate-limit";
 
 const logoDir = join(process.cwd(), "data");
 
 export async function action({ request }: { request: Request }) {
   if (request.method !== "POST") return new Response("Method not allowed", { status: 405 });
+
+  // Rate limit: 10 logo uploads per 10 minutes
+  const limited = rateLimit("logo", request, 10, 10 * 60 * 1000);
+  if (limited) return limited;
 
   const session = await getSession(request);
   if (!session) return Response.json({ error: "Unauthorized" }, { status: 401 });
@@ -45,10 +50,14 @@ export async function loader({ request }: { request: Request }) {
         ".svg": "image/svg+xml", ".png": "image/png", ".jpg": "image/jpeg",
         ".jpeg": "image/jpeg", ".webp": "image/webp", ".gif": "image/gif", ".ico": "image/x-icon",
       };
+      // Prevent SVG XSS — serve SVG logos as PNG-safe or force download
+      const safeType = ext === ".svg" ? "image/svg+xml" : (mimeMap[ext] || "application/octet-stream");
       return new Response(data, {
         headers: {
-          "Content-Type": mimeMap[ext] || "application/octet-stream",
+          "Content-Type": safeType,
           "Cache-Control": "public, max-age=3600",
+          "X-Content-Type-Options": "nosniff",
+          "Content-Security-Policy": "default-src 'none'; style-src 'unsafe-inline'",
         },
       });
     }

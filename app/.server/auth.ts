@@ -1,10 +1,17 @@
+import crypto from "crypto";
 import bcrypt from "bcryptjs";
 import jwt from "jsonwebtoken";
 import { nanoid } from "nanoid";
 import { query, queryOne, execute } from "~/.server/db";
 
-const JWT_SECRET = process.env.JWT_SECRET || "change-this-secret-key-in-production";
+const DEFAULT_SECRET = "change-this-secret-key-in-production";
+const JWT_SECRET = process.env.JWT_SECRET || DEFAULT_SECRET;
 const JWT_EXPIRES_IN = "7d";
+
+// Warn loudly if using default secret
+if (JWT_SECRET === DEFAULT_SECRET && process.env.NODE_ENV === "production") {
+  console.error("\n⚠️  CRITICAL: JWT_SECRET is using the default value! Set a secure JWT_SECRET in .env before running in production.\n");
+}
 
 export interface User {
   id: string;
@@ -41,6 +48,14 @@ export function validateUsername(username: string): { valid: boolean; error?: st
 }
 
 export async function createUser(email: string, password: string, username: string): Promise<User> {
+  // Validate email format
+  const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+  if (!emailRegex.test(email)) throw new Error("Invalid email format");
+
+  // Enforce password minimum length
+  if (!password || password.length < 6) throw new Error("Password must be at least 6 characters");
+  if (password.length > 128) throw new Error("Password too long");
+
   const sanitized = sanitizeUsername(username);
   const validation = validateUsername(sanitized);
   if (!validation.valid) throw new Error(validation.error || "Invalid username");
@@ -89,4 +104,26 @@ export function getUserById(userId: string): User | null {
 export function isAdmin(userId: string): boolean {
   const settings = queryOne<{ is_admin: number }>("SELECT is_admin FROM user_settings WHERE user_id = ?", [userId]);
   return settings?.is_admin === 1;
+}
+
+export function hashApiToken(token: string): string {
+  return crypto.createHash("sha256").update(token).digest("hex");
+}
+
+export function verifyApiToken(token: string): { user_id: string } | null {
+  const hash = hashApiToken(token);
+  const row = queryOne<{ user_id: string; token: string }>(
+    "SELECT user_id, token FROM api_tokens WHERE token = ?", [hash]
+  );
+  if (!row) {
+    // Fallback: check unhashed tokens (migration support for existing tokens)
+    const plain = queryOne<{ user_id: string; token: string }>(
+      "SELECT user_id, token FROM api_tokens WHERE token = ?", [token]
+    );
+    if (!plain) return null;
+    // Migrate: hash the plaintext token in-place
+    try { execute("UPDATE api_tokens SET token = ? WHERE token = ?", [hash, token]); } catch {}
+    return { user_id: plain.user_id };
+  }
+  return { user_id: row.user_id };
 }

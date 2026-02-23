@@ -2,10 +2,15 @@ import { getSession } from "~/.server/session";
 import { isAdmin } from "~/.server/auth";
 import { queryOne, execute, query } from "~/.server/db";
 import { getStorage } from "~/.server/storage";
+import { rateLimit } from "~/.server/rate-limit";
 
 export async function action({ request, params }: { request: Request; params: { userId: string } }) {
   const session = await getSession(request);
   if (!session || !isAdmin(session.user.id)) return Response.json({ error: "Forbidden" }, { status: 403 });
+
+  // Rate limit admin actions: 30 per 10 minutes
+  const limited = rateLimit("admin-users", request, 30, 10 * 60 * 1000);
+  if (limited) return limited;
 
   const { userId } = params;
 

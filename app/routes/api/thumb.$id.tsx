@@ -12,6 +12,7 @@ export async function loader({ params }: { params: { id: string } }) {
       headers: {
         "Content-Type": "image/webp",
         "Cache-Control": "public, max-age=31536000, immutable",
+        "X-Content-Type-Options": "nosniff",
       },
     });
   } catch {

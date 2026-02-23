@@ -38,10 +38,13 @@ export function getAvatarUrl(seed: string, size = 80): string {
 }
 
 export function generateToken(): string {
+  // Use crypto.getRandomValues for secure token generation
+  const bytes = new Uint8Array(30);
+  crypto.getRandomValues(bytes);
   const chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789";
   let result = "rxshare_";
-  for (let i = 0; i < 40; i++) {
-    result += chars.charAt(Math.floor(Math.random() * chars.length));
+  for (let i = 0; i < 30; i++) {
+    result += chars[bytes[i] % chars.length];
   }
   return result;
 }

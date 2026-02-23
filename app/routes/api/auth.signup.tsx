@@ -3,9 +3,15 @@ import { createUser, generateToken } from "~/.server/auth";
 import { createSessionHeaders } from "~/.server/session";
 import { execute, queryOne } from "~/.server/db";
 import { markSetupDone, isFirstRun } from "~/.server/db";
+import { rateLimit } from "~/.server/rate-limit";
 
 export async function action({ request }: { request: Request }) {
   if (request.method !== "POST") return new Response("Method not allowed", { status: 405 });
+
+  // Rate limit: 5 signups per 30 minutes per IP
+  const limited = rateLimit("signup", request, 5, 30 * 60 * 1000);
+  if (limited) return limited;
+
   const body = await request.json();
   const { email, password, username, isSetup, siteName, baseUrl } = body;
 

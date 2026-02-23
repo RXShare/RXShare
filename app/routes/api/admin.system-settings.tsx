@@ -1,6 +1,7 @@
 import { getSession } from "~/.server/session";
 import { isAdmin } from "~/.server/auth";
 import { queryOne, execute } from "~/.server/db";
+import { rateLimit } from "~/.server/rate-limit";
 
 export async function loader({ request }: { request: Request }) {
   const session = await getSession(request);
@@ -11,6 +12,11 @@ export async function loader({ request }: { request: Request }) {
 
 export async function action({ request }: { request: Request }) {
   if (request.method !== "PUT") return new Response("Method not allowed", { status: 405 });
+
+  // Rate limit: 30 settings changes per 10 minutes
+  const limited = rateLimit("admin-settings", request, 30, 10 * 60 * 1000);
+  if (limited) return limited;
+
   const session = await getSession(request);
   if (!session || !isAdmin(session.user.id)) return Response.json({ error: "Forbidden" }, { status: 403 });
 

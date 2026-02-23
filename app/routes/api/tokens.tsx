@@ -2,6 +2,8 @@ import { nanoid } from "nanoid";
 import { getSession } from "~/.server/session";
 import { query, queryOne, execute } from "~/.server/db";
 import { generateToken } from "~/lib/utils-format";
+import { hashApiToken } from "~/.server/auth";
+import { rateLimit } from "~/.server/rate-limit";
 
 export async function loader({ request }: { request: Request }) {
   const session = await getSession(request);
@@ -15,11 +17,16 @@ export async function action({ request }: { request: Request }) {
   if (!session) return Response.json({ error: "Unauthorized" }, { status: 401 });
 
   if (request.method === "POST") {
+    // Rate limit: 10 token creations per hour
+    const limited = rateLimit("tokens", request, 10, 60 * 60 * 1000);
+    if (limited) return limited;
+
     const { name } = await request.json();
     if (!name?.trim()) return Response.json({ error: "Name required" }, { status: 400 });
     const token = generateToken();
+    const tokenHash = hashApiToken(token);
     execute("INSERT INTO api_tokens (id, user_id, token, name, created_at) VALUES (?, ?, ?, ?, ?)",
-      [nanoid(), session.user.id, token, name.trim(), new Date().toISOString()]);
+      [nanoid(), session.user.id, tokenHash, name.trim(), new Date().toISOString()]);
     return Response.json({ token });
   }
 
