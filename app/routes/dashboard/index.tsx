@@ -174,12 +174,12 @@ export default function UploadsPage() {
           onDrop={handleDrop}
           onClick={() => fileInputRef.current?.click()}
           className={cn(
-            "glass-card rounded-2xl p-1 relative overflow-hidden group cursor-pointer border-dashed border-2 transition-colors",
+            "rounded-2xl relative overflow-hidden group cursor-pointer border-dashed border-2 transition-colors bg-[#0a0a0a]/50 backdrop-blur-xl",
             dragActive ? "border-primary/50" : "border-white/10 hover:border-primary/50"
           )}
         >
           <div className={cn("absolute inset-0 bg-primary/5 opacity-0 transition-opacity", dragActive && "opacity-100")} />
-          <div className="h-full rounded-xl bg-[#0a0a0a]/50 flex flex-col items-center justify-center text-center p-6 relative z-10">
+          <div className="h-full flex flex-col items-center justify-center text-center p-6 relative z-10">
             {uploading ? (
               <div className="space-y-3">
                 <div className="w-16 h-16 rounded-full bg-primary/20 flex items-center justify-center shadow-glow-primary">
