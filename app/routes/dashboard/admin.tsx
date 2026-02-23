@@ -257,7 +257,7 @@ function UsersTab({ users, allUploads, currentUserId, toast, revalidator }: any)
 }
 
 function SettingsTab({ systemSettings, toast, revalidator }: any) {
-  const [siteName, setSiteName] = useState(systemSettings?.site_name || "XShare");
+  const [siteName, setSiteName] = useState(systemSettings?.site_name || "RXShare");
   const [siteDesc, setSiteDesc] = useState(systemSettings?.site_description || "");
   const [baseUrl, setBaseUrl] = useState(systemSettings?.base_url || "");
   const [allowReg, setAllowReg] = useState(systemSettings?.allow_registration !== 0);
@@ -335,10 +335,10 @@ function DesignTab({ systemSettings, toast, revalidator }: any) {
     try {
       const formData = new FormData();
       formData.append("file", file);
-      const res = await fetch("/api/upload", { method: "POST", body: formData });
+      const res = await fetch("/api/logo", { method: "POST", body: formData });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error);
-      setLogoUrl(data.raw_url || data.url);
+      setLogoUrl(data.url);
       toast({ title: "Logo uploaded!" });
     } catch (err: any) {
       toast({ title: "Upload failed", description: err.message, variant: "destructive" });
@@ -410,6 +410,11 @@ function DesignTab({ systemSettings, toast, revalidator }: any) {
         <div>
           <label className="text-sm font-medium text-gray-400 mb-3 block">Application Logo</label>
           <div className="flex items-start gap-4">
+            {logoUrl && (
+              <div className="w-20 h-20 rounded-xl bg-[#1a1a1a] border border-white/10 flex items-center justify-center overflow-hidden shrink-0">
+                <img src={logoUrl.startsWith("/api/logo") ? `${logoUrl}?t=${Date.now()}` : logoUrl} alt="Logo preview" className="w-full h-full object-contain p-1" />
+              </div>
+            )}
             <label className="w-20 h-20 rounded-xl bg-[#1a1a1a] border border-dashed border-gray-600 flex flex-col items-center justify-center text-gray-500 hover:border-primary hover:text-primary transition-colors cursor-pointer shrink-0">
               <Icon name="cloud_upload" className="text-2xl mb-1" />
               <span className="text-[10px] uppercase font-bold">{uploading ? "..." : "Upload"}</span>
@@ -447,7 +452,7 @@ function DesignTab({ systemSettings, toast, revalidator }: any) {
           <div className="absolute inset-0 bg-grid-pattern opacity-10" />
           <div className="text-xs text-gray-500 absolute top-3 left-3 flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-green-500 animate-pulse" /> Live Preview</div>
           <button className="relative text-white px-8 py-3 rounded-lg font-bold shadow-lg transition-all overflow-hidden" style={{ backgroundColor: primaryColor }}>
-            <span className="relative z-10">Save Changes</span>
+            <span className="relative z-10">Example Button</span>
           </button>
           <div className="flex gap-3">
             <span className="px-3 py-1 rounded-full text-xs font-semibold border" style={{ backgroundColor: `${primaryColor}20`, color: primaryColor, borderColor: `${primaryColor}30` }}>Badge</span>

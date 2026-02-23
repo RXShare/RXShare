@@ -53,7 +53,7 @@ export default function SettingsPage() {
   const downloadShareXConfig = () => {
     const base = systemSettings?.base_url || window.location.origin;
     const config = {
-      Version: "14.0.0", Name: systemSettings?.site_name || "XShare",
+      Version: "14.0.0", Name: systemSettings?.site_name || "RXShare",
       DestinationType: "ImageUploader, TextUploader, FileUploader",
       RequestMethod: "POST", RequestURL: `${base}/api/upload`,
       Headers: { Authorization: "Bearer YOUR_API_TOKEN" },
@@ -62,7 +62,7 @@ export default function SettingsPage() {
     };
     const blob = new Blob([JSON.stringify(config, null, 2)], { type: "application/json" });
     const a = document.createElement("a"); a.href = URL.createObjectURL(blob);
-    a.download = `${(systemSettings?.site_name || "XShare").replace(/\s/g, "")}.sxcu`;
+    a.download = `${(systemSettings?.site_name || "RXShare").replace(/\s/g, "")}.sxcu`;
     a.click(); URL.revokeObjectURL(a.href);
   };
 

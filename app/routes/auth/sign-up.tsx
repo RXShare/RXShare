@@ -26,7 +26,7 @@ export default function SignUp() {
         <div className="glass-card rounded-2xl p-8 w-full max-w-md text-center shadow-glow-card">
           <div className="flex items-center justify-center gap-3 mb-4">
             <img src={logo} alt="" className="h-12 w-12 object-contain" />
-            <span className="text-2xl font-bold text-white">{settings?.site_name || "XShare"}</span>
+            <span className="text-2xl font-bold text-white">{settings?.site_name || "RXShare"}</span>
           </div>
           <h2 className="text-xl font-bold text-white mb-2">Registration Closed</h2>
           <p className="text-gray-500 text-sm">Registration is currently disabled by the administrator.</p>
@@ -68,7 +68,7 @@ export default function SignUp() {
             <div className="relative z-10">
               <div className="flex items-center justify-center gap-3 mb-4">
                 <img src={logo} alt="" className="h-12 w-12 object-contain" />
-                <span className="text-2xl font-bold text-white tracking-tight">{settings?.site_name || "XShare"}</span>
+                <span className="text-2xl font-bold text-white tracking-tight">{settings?.site_name || "RXShare"}</span>
               </div>
               <h2 className="text-xl font-bold text-white">Create Account</h2>
               <p className="text-gray-500 text-sm mt-1">Sign up to start sharing files</p>

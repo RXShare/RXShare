@@ -28,6 +28,7 @@ export default [
   route("api/admin/system-settings", "routes/api/admin.system-settings.tsx"),
   route("api/admin/users/:userId", "routes/api/admin.users.$userId.tsx"),
   route("api/system-settings/public", "routes/api/system-settings.public.tsx"),
+  route("api/logo", "routes/api/logo.tsx"),
   route("api/files/*", "routes/api/files.tsx"),
   route("api/thumb/:id", "routes/api/thumb.$id.tsx"),
 ] satisfies RouteConfig;

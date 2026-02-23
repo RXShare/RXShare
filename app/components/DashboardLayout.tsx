@@ -52,13 +52,13 @@ export function SidebarLayout({ children, user, systemSettings, isAdmin: admin }
   return (
     <div className="text-gray-300 antialiased h-screen flex overflow-hidden font-sans relative">
       <div className={cn("fixed inset-0 opacity-40 pointer-events-none z-0", pat)} />
-      <aside className="w-72 flex-shrink-0 glass flex flex-col justify-between h-full z-30 relative ml-4 my-4 rounded-2xl shadow-2xl">
-        <div>
+      <aside className="w-72 flex-shrink-0 glass flex flex-col justify-between z-30 relative ml-4 my-4 rounded-2xl shadow-2xl" style={{ height: "calc(100vh - 2rem)" }}>
+        <div className="flex-1 overflow-y-auto overflow-x-hidden">
           <div className="h-20 flex items-center px-8 border-b border-white/5 relative overflow-hidden">
             <div className="absolute inset-0 bg-gradient-to-r from-primary/10 to-transparent opacity-50" />
             <button onClick={() => navigate("/dashboard")} className="flex items-center gap-3 font-bold text-2xl tracking-tight text-white relative z-10 hover:opacity-80 transition-opacity">
               <img src={getLogo(systemSettings)} alt="" className="h-12 w-12 object-contain" />
-              <span>{systemSettings?.site_name || "XShare"}</span>
+              <span>{systemSettings?.site_name || "RXShare"}</span>
             </button>
           </div>
           <nav className="p-4 space-y-2 mt-2">
@@ -143,7 +143,7 @@ export function HeaderLayout({ children, user, systemSettings, isAdmin: admin }:
           <div className="flex items-center gap-6">
             <button onClick={() => navigate("/dashboard")} className="flex items-center gap-3 font-bold text-xl tracking-tight text-white hover:opacity-80 transition-opacity">
               <img src={getLogo(systemSettings)} alt="" className="h-10 w-10 object-contain" />
-              <span>{systemSettings?.site_name || "XShare"}</span>
+              <span>{systemSettings?.site_name || "RXShare"}</span>
             </button>
             <nav className="flex items-center gap-1">
               {items.map((item) => {

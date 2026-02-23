@@ -28,7 +28,7 @@ export async function action({ request }: { request: Request }) {
       if (!existing) {
         execute(
           "INSERT INTO system_settings (id, site_name, base_url) VALUES (?, ?, ?)",
-          [nanoid(), siteName || "XShare", baseUrl || null]
+          [nanoid(), siteName || "RXShare", baseUrl || null]
         );
       }
       markSetupDone();

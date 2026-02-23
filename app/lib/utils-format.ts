@@ -22,12 +22,24 @@ export function formatRelativeDate(dateStr: string): string {
 }
 
 export function getAvatarUrl(seed: string, size = 80): string {
-  return `https://api.dicebear.com/9.x/initials/svg?seed=${encodeURIComponent(seed)}&size=${size}&backgroundColor=1a1a1a&textColor=ffffff`;
+  const initials = seed
+    .split(/[\s@._-]+/)
+    .filter(Boolean)
+    .slice(0, 2)
+    .map((s) => s[0]?.toUpperCase() || "")
+    .join("") || "?";
+  // Generate a consistent color from the seed
+  let hash = 0;
+  for (let i = 0; i < seed.length; i++) hash = seed.charCodeAt(i) + ((hash << 5) - hash);
+  const hue = Math.abs(hash) % 360;
+  const bg = `hsl(${hue}, 45%, 25%)`;
+  const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="${size}" height="${size}" viewBox="0 0 ${size} ${size}"><rect width="${size}" height="${size}" fill="${bg}"/><text x="50%" y="50%" dy=".1em" fill="#fff" font-family="system-ui,sans-serif" font-size="${size * 0.4}" font-weight="600" text-anchor="middle" dominant-baseline="central">${initials}</text></svg>`;
+  return `data:image/svg+xml,${encodeURIComponent(svg)}`;
 }
 
 export function generateToken(): string {
   const chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789";
-  let result = "xshare_";
+  let result = "rxshare_";
   for (let i = 0; i < 40; i++) {
     result += chars.charAt(Math.floor(Math.random() * chars.length));
   }

@@ -78,7 +78,7 @@ export function getMigrationSQL(dbType: DbType): string[] {
     )`,
     `CREATE TABLE IF NOT EXISTS system_settings (
       id ${textType} PRIMARY KEY,
-      site_name ${textType} NOT NULL DEFAULT 'XShare',
+      site_name ${textType} NOT NULL DEFAULT 'RXShare',
       site_description ${textType} NOT NULL DEFAULT 'Simple file sharing',
       allow_registration ${intBool} NOT NULL DEFAULT 1,
       allow_login ${intBool} NOT NULL DEFAULT 1,

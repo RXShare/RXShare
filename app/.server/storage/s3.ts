@@ -13,7 +13,7 @@ function getClient() {
   });
 }
 
-const bucket = () => process.env.S3_BUCKET || "xshare";
+const bucket = () => process.env.S3_BUCKET || "rxshare";
 
 export function createS3Storage(): StorageAdapter {
   const client = getClient();
