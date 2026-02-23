@@ -20,8 +20,13 @@ export async function action({ request }: { request: Request }) {
 
   for (const key of allowed) {
     if (body[key] !== undefined) {
+      let val = body[key];
+      // Validate color
+      if (key === "embed_color" && typeof val === "string" && !/^#[0-9a-fA-F]{3,8}$/.test(val)) continue;
+      // Sanitize strings
+      if (typeof val === "string") val = val.replace(/[\x00-\x08\x0B\x0C\x0E-\x1F]/g, "");
       sets.push(`${key} = ?`);
-      vals.push(key === "default_public" ? (body[key] ? 1 : 0) : body[key]);
+      vals.push(key === "default_public" ? (val ? 1 : 0) : val);
     }
   }
 

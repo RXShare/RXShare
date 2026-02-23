@@ -19,13 +19,21 @@ export async function action({ request }: { request: Request }) {
   if (!sys) return Response.json({ error: "No system settings" }, { status: 500 });
 
   const allowed = ["site_name", "site_description", "base_url", "allow_registration", "allow_login", "allow_email", "default_quota", "max_upload_size", "primary_color", "accent_color", "dashboard_layout", "logo_url", "background_pattern"];
+  const colorFields = ["primary_color", "accent_color"];
   const sets: string[] = [];
   const vals: any[] = [];
 
   for (const key of allowed) {
     if (body[key] !== undefined) {
+      let val = body[key];
+      // Validate color fields
+      if (colorFields.includes(key) && typeof val === "string") {
+        if (!/^#[0-9a-fA-F]{3,8}$/.test(val)) continue;
+      }
+      // Sanitize string values — strip control chars
+      if (typeof val === "string") val = val.replace(/[\x00-\x08\x0B\x0C\x0E-\x1F]/g, "");
       sets.push(`${key} = ?`);
-      vals.push(body[key]);
+      vals.push(val);
     }
   }
 

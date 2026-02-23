@@ -21,6 +21,7 @@ export function meta({ data }: { data: any }) {
   const isImage = upload.mime_type?.startsWith("image/");
   const fileUrl = `${baseUrl}/api/files/${upload.file_path}`;
   const previewUrl = upload.preview_path ? `${baseUrl}/api/files/${upload.preview_path}` : isImage ? fileUrl : null;
+  const safeColor = (c: string) => /^#[0-9a-fA-F]{3,8}$/.test(c) ? c : "#f97316";
   return [
     { title: upload.embed_title || upload.original_name },
     { name: "description", content: upload.embed_description || `${upload.original_name} - ${formatFileSize(upload.file_size)}` },
@@ -28,7 +29,7 @@ export function meta({ data }: { data: any }) {
     { property: "og:description", content: upload.embed_description || formatFileSize(upload.file_size) },
     ...(previewUrl ? [{ property: "og:image", content: previewUrl }] : []),
     { property: "og:type", content: isImage ? "image" : "website" },
-    { name: "theme-color", content: upload.embed_color || primaryColor || "#f97316" },
+    { name: "theme-color", content: safeColor(upload.embed_color || primaryColor || "#f97316") },
     ...(upload.mime_type?.startsWith("video/") ? [
       { property: "og:video", content: fileUrl },
       { property: "og:video:type", content: upload.mime_type },

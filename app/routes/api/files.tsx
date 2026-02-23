@@ -27,11 +27,17 @@ export async function loader({ request }: { request: Request }) {
     };
     const contentType = mimeMap[ext] || "application/octet-stream";
 
+    // Prevent XSS: never serve HTML/SVG as executable content from same origin
+    const dangerousTypes = ["text/html", "image/svg+xml", "text/javascript", "application/javascript"];
+    const finalType = dangerousTypes.includes(contentType) ? "application/octet-stream" : contentType;
+
     return new Response(data, {
       headers: {
-        "Content-Type": contentType,
+        "Content-Type": finalType,
         "Cache-Control": "public, max-age=31536000, immutable",
         "Content-Length": String(data.length),
+        "Content-Security-Policy": "default-src 'none'; style-src 'unsafe-inline'",
+        "X-Content-Type-Options": "nosniff",
       },
     });
   } catch {

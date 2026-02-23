@@ -19,6 +19,7 @@ export async function action({ request }: { request: Request }) {
   const file = formData.get("file") as File | null;
   if (!file) return Response.json({ error: "No file provided" }, { status: 400 });
   if (!file.type.startsWith("image/")) return Response.json({ error: "Images only" }, { status: 400 });
+  if (file.size > 5 * 1024 * 1024) return Response.json({ error: "Logo must be under 5MB" }, { status: 400 });
 
   const ext = extname(file.name).toLowerCase().replace(/[^a-z.]/g, "");
   const allowedExts = [".svg", ".png", ".jpg", ".jpeg", ".webp", ".gif", ".ico"];
