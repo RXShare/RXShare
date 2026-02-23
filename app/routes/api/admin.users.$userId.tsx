@@ -44,7 +44,7 @@ export async function action({ request, params }: { request: Request; params: { 
     if (userId === session.user.id) return Response.json({ error: "Cannot delete yourself" }, { status: 400 });
     // Delete user's files from storage
     const uploads = query<any>("SELECT file_path, thumbnail_path, preview_path FROM uploads WHERE user_id = ?", [userId]);
-    const storage = getStorage();
+    const storage = await getStorage();
     for (const u of uploads) {
       await storage.delete(u.file_path);
       if (u.thumbnail_path) await storage.delete(u.thumbnail_path);

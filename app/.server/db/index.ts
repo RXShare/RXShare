@@ -19,11 +19,11 @@ export function markSetupDone(): void {
   writeFileSync(setupMarker, new Date().toISOString(), "utf-8");
 }
 
-export function getDb(): DatabaseAdapter {
+export async function getDb(): Promise<DatabaseAdapter> {
   if (!db) {
     const dbType = getDbType();
     if (dbType === "mysql") {
-      const { createMysqlAdapter } = require("./mysql") as { createMysqlAdapter: () => DatabaseAdapter };
+      const { createMysqlAdapter } = await import("./mysql");
       db = createMysqlAdapter();
     } else {
       db = createSqliteAdapter();
@@ -32,11 +32,11 @@ export function getDb(): DatabaseAdapter {
   return db;
 }
 
-export function initDatabase(): void {
+export async function initDatabase(): Promise<void> {
   if (initialized) return;
   const dbType = getDbType();
   if (dbType === "sqlite") {
-    const adapter = getDb();
+    const adapter = await getDb();
     for (const sql of getMigrationSQL("sqlite")) adapter.exec(sql);
     for (const sql of getIndexSQL()) { try { adapter.exec(sql); } catch {} }
     for (const sql of getMigrationUpdates()) { try { adapter.exec(sql); } catch {} }
@@ -53,19 +53,33 @@ export async function initDatabaseAsync(): Promise<void> {
     for (const sql of getIndexSQL()) { try { await mysqlExec(sql); } catch {} }
     initialized = true;
   } else {
-    initDatabase();
+    await initDatabase();
+  }
+}
+
+// These sync wrappers only work with SQLite (which is sync).
+// For MySQL, initDatabaseAsync must be called first via the root loader.
+function ensureInit() {
+  if (!initialized && getDbType() === "sqlite") {
+    // For SQLite, we can init synchronously since getDb resolves immediately for sqlite
+    const adapter = createSqliteAdapter();
+    if (!db) db = adapter;
+    for (const sql of getMigrationSQL("sqlite")) adapter.exec(sql);
+    for (const sql of getIndexSQL()) { try { adapter.exec(sql); } catch {} }
+    for (const sql of getMigrationUpdates()) { try { adapter.exec(sql); } catch {} }
+    initialized = true;
   }
 }
 
 export function query<T = any>(sql: string, params: any[] = []): T[] {
-  initDatabase(); return getDb().query<T>(sql, params);
+  ensureInit(); return db!.query<T>(sql, params);
 }
 export function queryOne<T = any>(sql: string, params: any[] = []): T | undefined {
-  initDatabase(); return getDb().queryOne<T>(sql, params);
+  ensureInit(); return db!.queryOne<T>(sql, params);
 }
 export function execute(sql: string, params: any[] = []): DbResult {
-  initDatabase(); return getDb().execute(sql, params);
+  ensureInit(); return db!.execute(sql, params);
 }
 export function transaction<T>(fn: () => T): T {
-  initDatabase(); return getDb().transaction(fn);
+  ensureInit(); return db!.transaction(fn);
 }

@@ -10,7 +10,7 @@ export async function loader({ request }: { request: Request }) {
   if (filePath.startsWith("/")) filePath = filePath.slice(1);
   if (!filePath || filePath.includes("..")) return new Response("Forbidden", { status: 403 });
 
-  const storage = getStorage();
+  const storage = await getStorage();
   try {
     const exists = await storage.exists(filePath);
     if (!exists) return new Response("Not Found", { status: 404 });

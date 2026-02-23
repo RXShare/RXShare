@@ -16,7 +16,7 @@ export async function action({ request, params }: { request: Request; params: { 
   const upload = queryOne<any>("SELECT * FROM uploads WHERE id = ? AND user_id = ?", [params.id, session.user.id]);
   if (!upload) return Response.json({ error: "Not found" }, { status: 404 });
 
-  const storage = getStorage();
+  const storage = await getStorage();
   await storage.delete(upload.file_path);
   if (upload.thumbnail_path) await storage.delete(upload.thumbnail_path);
   if (upload.preview_path) await storage.delete(upload.preview_path);

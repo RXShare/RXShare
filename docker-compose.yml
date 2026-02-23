@@ -1,0 +1,18 @@
+services:
+  rxshare:
+    build: .
+    ports:
+      - "3000:3000"
+    volumes:
+      - rxshare-data:/app/data
+    environment:
+      - NODE_ENV=production
+      - PORT=3000
+      # Set a real secret here or let the setup wizard generate one
+      # - JWT_SECRET=change-me
+      # - DB_TYPE=sqlite
+      # - STORAGE_TYPE=local
+    restart: unless-stopped
+
+volumes:
+  rxshare-data:

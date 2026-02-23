@@ -5,7 +5,7 @@ export async function loader({ params }: { params: { id: string } }) {
   const upload = queryOne<any>("SELECT thumbnail_path FROM uploads WHERE id = ?", [params.id]);
   if (!upload?.thumbnail_path) return new Response("Not Found", { status: 404 });
 
-  const storage = getStorage();
+  const storage = await getStorage();
   try {
     const data = await storage.read(upload.thumbnail_path);
     return new Response(data, {

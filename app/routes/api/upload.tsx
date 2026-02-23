@@ -51,7 +51,7 @@ export async function action({ request }: { request: Request }) {
   const filePath = `${user.id}/${fileName}`;
   const buffer = Buffer.from(await file.arrayBuffer());
 
-  const storage = getStorage();
+  const storage = await getStorage();
   await storage.save(filePath, buffer);
 
   const uploadId = nanoid();

@@ -3,11 +3,11 @@ import { createLocalStorage } from "./local";
 
 let storage: StorageAdapter | null = null;
 
-export function getStorage(): StorageAdapter {
+export async function getStorage(): Promise<StorageAdapter> {
   if (!storage) {
     const type = getStorageType();
     if (type === "s3") {
-      const { createS3Storage } = require("./s3") as { createS3Storage: () => StorageAdapter };
+      const { createS3Storage } = await import("./s3");
       storage = createS3Storage();
     } else {
       storage = createLocalStorage();

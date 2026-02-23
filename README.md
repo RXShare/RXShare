@@ -17,7 +17,21 @@ Self-hosted file sharing. Upload stuff, get links, share them. Dark UI with glas
 - SQLite by default, MySQL/MariaDB if you need it
 - Local file storage by default, S3-compatible storage if you want it
 
-## Setup
+## Quick Install
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/RXShare/RXShare/main/install.sh | bash
+```
+
+Or specify a directory:
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/RXShare/RXShare/main/install.sh | bash -s /opt/rxshare
+```
+
+Then just `cd rxshare && npm start` and open `http://localhost:3000`. The setup wizard handles the rest.
+
+## Manual Install
 
 ```bash
 git clone https://github.com/RXShare/RXShare.git
@@ -27,13 +41,26 @@ npm run build
 npm start
 ```
 
-Open it in your browser and the setup wizard will walk you through database, storage, and admin account creation.
+## Docker
+
+```bash
+docker compose up -d
+```
+
+Or build and run manually:
+
+```bash
+docker build -t rxshare .
+docker run -d -p 3000:3000 -v rxshare-data:/app/data rxshare
+```
+
+The `data` volume holds your database and uploaded files. Don't lose it.
 
 ## Config
 
 Everything goes in `.env` — check `.env.example` for the full list. The setup wizard writes this for you on first run.
 
-The only thing you really need to set manually is `JWT_SECRET` if you're not using the wizard.
+If you're running with Docker, pass env vars through `docker-compose.yml` or `-e` flags.
 
 ## Scripts
 
