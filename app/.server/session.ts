@@ -1,7 +1,7 @@
 import { type Cookie, createCookie } from "react-router";
 import { verifyToken, getUserById, type User } from "./auth";
 
-const sessionCookie: Cookie = createCookie("xshare_session", {
+const sessionCookie: Cookie = createCookie("rxshare_session", {
   httpOnly: true,
   secure: process.env.NODE_ENV === "production",
   sameSite: "lax",

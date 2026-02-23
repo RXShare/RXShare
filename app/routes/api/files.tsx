@@ -2,8 +2,13 @@ import { getStorage } from "~/.server/storage";
 
 export async function loader({ request }: { request: Request }) {
   const url = new URL(request.url);
-  const filePath = url.pathname.replace("/api/files/", "");
+  let filePath = url.pathname.replace("/api/files/", "");
   if (!filePath) return new Response("Not Found", { status: 404 });
+
+  // Prevent path traversal
+  filePath = filePath.replace(/\.\./g, "").replace(/\/\//g, "/");
+  if (filePath.startsWith("/")) filePath = filePath.slice(1);
+  if (!filePath || filePath.includes("..")) return new Response("Forbidden", { status: 403 });
 
   const storage = getStorage();
   try {

@@ -10,6 +10,9 @@ export async function action({ request }: { request: Request }) {
   const body = await request.json();
   const { dbType, dbHost, dbPort, dbUser, dbPassword, dbName, storageType, s3Bucket, s3Region, s3AccessKey, s3SecretKey, s3Endpoint } = body;
 
+  // Sanitize all values — strip newlines to prevent .env injection
+  const clean = (v: any) => String(v || "").replace(/[\r\n]/g, "");
+
   const envPath = join(process.cwd(), ".env");
   const jwtSecret = crypto.randomBytes(32).toString("hex");
 
@@ -20,27 +23,27 @@ export async function action({ request }: { request: Request }) {
     `JWT_SECRET=${jwtSecret}`,
     "",
     "# Database",
-    `DB_TYPE=${dbType || "sqlite"}`,
+    `DB_TYPE=${clean(dbType) || "sqlite"}`,
   ];
 
   if (dbType === "mysql") {
-    lines.push(`DB_HOST=${dbHost || "localhost"}`);
-    lines.push(`DB_PORT=${dbPort || "3306"}`);
-    lines.push(`DB_USER=${dbUser || "root"}`);
-    lines.push(`DB_PASSWORD=${dbPassword || ""}`);
-    lines.push(`DB_NAME=${dbName || "rxshare"}`);
+    lines.push(`DB_HOST=${clean(dbHost) || "localhost"}`);
+    lines.push(`DB_PORT=${clean(dbPort) || "3306"}`);
+    lines.push(`DB_USER=${clean(dbUser) || "root"}`);
+    lines.push(`DB_PASSWORD=${clean(dbPassword) || ""}`);
+    lines.push(`DB_NAME=${clean(dbName) || "rxshare"}`);
   }
 
   lines.push("");
   lines.push("# Storage");
-  lines.push(`STORAGE_TYPE=${storageType || "local"}`);
+  lines.push(`STORAGE_TYPE=${clean(storageType) || "local"}`);
 
   if (storageType === "s3") {
-    lines.push(`S3_BUCKET=${s3Bucket || ""}`);
-    lines.push(`S3_REGION=${s3Region || "us-east-1"}`);
-    lines.push(`S3_ACCESS_KEY=${s3AccessKey || ""}`);
-    lines.push(`S3_SECRET_KEY=${s3SecretKey || ""}`);
-    if (s3Endpoint) lines.push(`S3_ENDPOINT=${s3Endpoint}`);
+    lines.push(`S3_BUCKET=${clean(s3Bucket) || ""}`);
+    lines.push(`S3_REGION=${clean(s3Region) || "us-east-1"}`);
+    lines.push(`S3_ACCESS_KEY=${clean(s3AccessKey) || ""}`);
+    lines.push(`S3_SECRET_KEY=${clean(s3SecretKey) || ""}`);
+    if (s3Endpoint) lines.push(`S3_ENDPOINT=${clean(s3Endpoint)}`);
   }
 
   lines.push("");

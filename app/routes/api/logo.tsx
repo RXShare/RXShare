@@ -20,8 +20,10 @@ export async function action({ request }: { request: Request }) {
   if (!file) return Response.json({ error: "No file provided" }, { status: 400 });
   if (!file.type.startsWith("image/")) return Response.json({ error: "Images only" }, { status: 400 });
 
-  const ext = extname(file.name) || ".png";
-  const fileName = `logo${ext}`;
+  const ext = extname(file.name).toLowerCase().replace(/[^a-z.]/g, "");
+  const allowedExts = [".svg", ".png", ".jpg", ".jpeg", ".webp", ".gif", ".ico"];
+  const safeExt = allowedExts.includes(ext) ? ext : ".png";
+  const fileName = `logo${safeExt}`;
   const filePath = join(logoDir, fileName);
 
   if (!existsSync(logoDir)) await mkdir(logoDir, { recursive: true });

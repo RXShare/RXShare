@@ -11,8 +11,9 @@ export async function action({ request }: { request: Request }) {
 
   if (!email || !password || !username) return Response.json({ error: "All fields required" }, { status: 400 });
 
-  // Check registration allowed (unless setup)
-  if (!isSetup) {
+  // Check registration allowed (unless setup on first run)
+  const isSetupMode = isSetup && isFirstRun();
+  if (!isSetupMode) {
     const sys = queryOne<any>("SELECT allow_registration FROM system_settings LIMIT 1");
     if (sys && !sys.allow_registration) return Response.json({ error: "Registration is disabled" }, { status: 403 });
   }
@@ -20,7 +21,7 @@ export async function action({ request }: { request: Request }) {
   try {
     const user = await createUser(email, password, username);
 
-    if (isSetup && isFirstRun()) {
+    if (isSetupMode) {
       // Make admin
       execute("UPDATE user_settings SET is_admin = 1 WHERE user_id = ?", [user.id]);
       // Create system settings
@@ -34,7 +35,7 @@ export async function action({ request }: { request: Request }) {
       markSetupDone();
     }
 
-    if (isSetup) {
+    if (isSetupMode) {
       // Auto-login for setup
       const token = generateToken(user.id);
       const headers = await createSessionHeaders(token);
