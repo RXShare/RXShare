@@ -31,7 +31,7 @@ fi
 echo "✓ npm $(npm -v)"
 
 # Determine install directory
-INSTALL_DIR="${1:-/var/www/rxshare}"
+INSTALL_DIR="${1:-$(pwd)/rxshare}"
 
 if [ -d "$INSTALL_DIR" ] && [ -f "$INSTALL_DIR/package.json" ]; then
   echo ""
