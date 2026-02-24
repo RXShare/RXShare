@@ -1,12 +1,17 @@
 import { isFirstRun } from "~/.server/db";
-import { writeFileSync, readFileSync, existsSync } from "fs";
+import { writeFileSync } from "fs";
 import { join } from "path";
 import crypto from "crypto";
 import { rateLimit } from "~/.server/rate-limit";
+import { validateCsrf } from "~/.server/csrf";
 
 export async function action({ request }: { request: Request }) {
   if (request.method !== "POST") return new Response("Method not allowed", { status: 405 });
   if (!isFirstRun()) return Response.json({ error: "Setup already completed" }, { status: 403 });
+
+  // CSRF protection
+  const csrfError = await validateCsrf(request);
+  if (csrfError) return csrfError;
 
   // Rate limit: 5 attempts per 10 minutes
   const limited = rateLimit("setup", request, 5, 10 * 60 * 1000);

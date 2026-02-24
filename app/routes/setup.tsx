@@ -2,6 +2,7 @@ import { useState } from "react";
 import { useNavigate } from "react-router";
 import { useToast } from "~/components/ui/use-toast";
 import { Icon } from "~/components/Icon";
+import { getCsrfToken } from "~/lib/csrf";
 
 const DEFAULT_LOGO = "https://cdn.rxss.click/rexsystems/logo-transparent.svg";
 const TOTAL_STEPS = 5;
@@ -51,7 +52,7 @@ export default function Setup() {
       // Step 1: Save .env config
       const configRes = await fetch("/api/setup/config", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: { "Content-Type": "application/json", ...(getCsrfToken() ? { "X-CSRF-Token": getCsrfToken()! } : {}) },
         body: JSON.stringify({
           dbType, dbHost, dbPort, dbUser, dbPassword, dbName,
           storageType, s3Bucket, s3Region, s3AccessKey, s3SecretKey,
@@ -62,7 +63,7 @@ export default function Setup() {
 
       // Step 2: Create admin account + system settings
       const res = await fetch("/api/auth/signup", {
-        method: "POST", headers: { "Content-Type": "application/json" },
+        method: "POST", headers: { "Content-Type": "application/json", ...(getCsrfToken() ? { "X-CSRF-Token": getCsrfToken()! } : {}) },
         body: JSON.stringify({ email, password, username, isSetup: true, siteName, baseUrl: baseUrl || null }),
       });
       const data = await res.json();

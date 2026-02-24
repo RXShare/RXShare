@@ -2,10 +2,11 @@ import { nanoid } from "nanoid";
 import { getSession } from "~/.server/session";
 import { queryOne, execute } from "~/.server/db";
 import { getStorage } from "~/.server/storage";
-import { generateThumbnail, generatePreview } from "~/.server/thumbnails";
+import { generateThumbnails } from "~/.server/thumbnails";
 import { getBaseUrl } from "~/.server/base-url";
 import { rateLimit } from "~/.server/rate-limit";
 import { verifyApiToken } from "~/.server/auth";
+import { validateCsrf } from "~/.server/csrf";
 
 async function authenticateRequest(request: Request) {
   // Check session cookie first
@@ -27,6 +28,10 @@ async function authenticateRequest(request: Request) {
 
 export async function action({ request }: { request: Request }) {
   if (request.method !== "POST") return new Response("Method not allowed", { status: 405 });
+
+  // CSRF protection (skipped for Bearer token auth)
+  const csrfError = await validateCsrf(request);
+  if (csrfError) return csrfError;
 
   // Rate limit: 30 uploads per 10 minutes per IP
   const limited = rateLimit("upload", request, 30, 10 * 60 * 1000);
@@ -57,12 +62,13 @@ export async function action({ request }: { request: Request }) {
   const uploadId = nanoid();
   const now = new Date().toISOString();
 
-  // Generate thumbnail for images
+  // Generate thumbnail + preview for images (single read)
   let thumbnailPath: string | null = null;
   let previewPath: string | null = null;
   try {
-    thumbnailPath = await generateThumbnail(filePath, file.type);
-    previewPath = await generatePreview(filePath, file.type);
+    const thumbs = await generateThumbnails(filePath, file.type);
+    thumbnailPath = thumbs.thumbnailPath;
+    previewPath = thumbs.previewPath;
   } catch {}
 
   execute(

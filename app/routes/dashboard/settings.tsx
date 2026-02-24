@@ -6,6 +6,7 @@ import { formatRelativeDate, generateToken } from "~/lib/utils-format";
 import { useToast } from "~/components/ui/use-toast";
 import { Switch } from "~/components/ui/switch";
 import { Icon } from "~/components/Icon";
+import { getCsrfToken } from "~/lib/csrf";
 
 export async function loader({ request }: { request: Request }) {
   const session = await getSession(request);
@@ -31,7 +32,7 @@ export default function SettingsPage() {
 
   const saveSettings = async () => {
     const res = await fetch("/api/user/settings", {
-      method: "PUT", headers: { "Content-Type": "application/json" },
+      method: "PUT", headers: { "Content-Type": "application/json", ...(getCsrfToken() ? { "X-CSRF-Token": getCsrfToken()! } : {}) },
       body: JSON.stringify({ embed_title: embedTitle, embed_description: embedDescription || null, embed_color: embedColor, default_public: defaultPublic, custom_path: customPath || null }),
     });
     if (res.ok) { revalidator.revalidate(); toast({ title: "Settings saved!" }); }
@@ -40,13 +41,13 @@ export default function SettingsPage() {
 
   const createToken = async () => {
     if (!tokenName.trim()) { toast({ title: "Enter a token name", variant: "destructive" }); return; }
-    const res = await fetch("/api/tokens", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ name: tokenName.trim() }) });
+    const res = await fetch("/api/tokens", { method: "POST", headers: { "Content-Type": "application/json", ...(getCsrfToken() ? { "X-CSRF-Token": getCsrfToken()! } : {}) }, body: JSON.stringify({ name: tokenName.trim() }) });
     const data = await res.json();
     if (res.ok) { setNewToken(data.token); setTokenName(""); revalidator.revalidate(); toast({ title: "Token created! Copy it now." }); }
   };
 
   const deleteToken = async (id: string) => {
-    await fetch("/api/tokens", { method: "DELETE", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ id }) });
+    await fetch("/api/tokens", { method: "DELETE", headers: { "Content-Type": "application/json", ...(getCsrfToken() ? { "X-CSRF-Token": getCsrfToken()! } : {}) }, body: JSON.stringify({ id }) });
     revalidator.revalidate(); toast({ title: "Token deleted" });
   };
 

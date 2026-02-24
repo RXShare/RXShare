@@ -12,7 +12,8 @@ export const links: LinksFunction = () => [
 ];
 
 export async function loader({ request }: { request: Request }) {
-  const { initDatabaseAsync, isFirstRun, queryOne, execute } = await import("~/.server/db");
+  const { initDatabaseAsync, isFirstRun, queryOne } = await import("~/.server/db");
+  const { generateCsrfToken, getCsrfFromCookie } = await import("~/.server/csrf");
   await initDatabaseAsync();
   const url = new URL(request.url);
   const path = url.pathname;
@@ -21,27 +22,57 @@ export async function loader({ request }: { request: Request }) {
     if (path !== "/setup" && isFirstRun()) throw new Response(null, { status: 302, headers: { Location: "/setup" } });
     if (path === "/setup" && !isFirstRun()) throw new Response(null, { status: 302, headers: { Location: "/" } });
   } catch (e) { throw e; }
+
+  let csrfCookieHeader: string | null = null;
+  let csrfToken: string | null = null;
+
+  // Generate CSRF token if not already set
+  const existingToken = await getCsrfFromCookie(request);
+  if (!existingToken) {
+    const csrf = await generateCsrfToken();
+    csrfCookieHeader = csrf.cookie;
+    csrfToken = csrf.token;
+  } else {
+    csrfToken = existingToken;
+  }
+
   // Load custom colors + background pattern for dynamic theming
+  let themeData: { primaryColor: string | null; backgroundPattern: string } | null = null;
   try {
     if (!isFirstRun()) {
-      // Ensure background_pattern column exists
-      try { execute("ALTER TABLE system_settings ADD COLUMN background_pattern TEXT NOT NULL DEFAULT 'grid'"); } catch {}
       const sys = queryOne<any>("SELECT primary_color, background_pattern FROM system_settings LIMIT 1");
       if (sys) {
-        return {
+        themeData = {
           primaryColor: sys.primary_color || null,
           backgroundPattern: sys.background_pattern || "grid",
         };
       }
     }
   } catch {}
-  return null;
+
+  const data = {
+    ...(themeData || {}),
+    csrfToken,
+  };
+
+  if (csrfCookieHeader) {
+    return new Response(JSON.stringify(data), {
+      headers: {
+        "Content-Type": "application/json",
+        "Set-Cookie": csrfCookieHeader,
+      },
+    });
+  }
+
+  return data;
 }
 
 export function Layout({ children }: { children: React.ReactNode }) {
   let colorStyle = "";
+  let csrfToken = "";
   try {
     const data = useLoaderData<typeof loader>() as any;
+    if (data?.csrfToken) csrfToken = data.csrfToken;
     if (data?.primaryColor) {
       const hex = String(data.primaryColor).replace(/[^#a-fA-F0-9]/g, "").slice(0, 7);
       if (/^#[0-9a-fA-F]{6}$/.test(hex)) {
@@ -60,6 +91,7 @@ export function Layout({ children }: { children: React.ReactNode }) {
       <head>
         <meta charSet="utf-8" />
         <meta name="viewport" content="width=device-width, initial-scale=1" />
+        {csrfToken && <meta name="csrf-token" content={csrfToken} />}
         <Meta />
         <Links />
         {colorStyle && <style dangerouslySetInnerHTML={{ __html: colorStyle }} />}

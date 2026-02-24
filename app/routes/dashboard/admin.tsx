@@ -9,6 +9,7 @@ import { useToast } from "~/components/ui/use-toast";
 import { Icon } from "~/components/Icon";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "~/components/ui/dialog";
 import { Switch } from "~/components/ui/switch";
+import { getCsrfToken } from "~/lib/csrf";
 
 export async function loader({ request }: { request: Request }) {
   const session = await getSession(request);
@@ -110,19 +111,19 @@ function UsersTab({ users, allUploads, currentUserId, toast, revalidator }: any)
 
   const toggleAdmin = async (userId: string) => {
     const user = users.find((u: any) => u.id === userId);
-    const res = await fetch(`/api/admin/users/${userId}`, { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ is_admin: user.is_admin ? 0 : 1 }) });
+    const res = await fetch(`/api/admin/users/${userId}`, { method: "PATCH", headers: { "Content-Type": "application/json", ...(getCsrfToken() ? { "X-CSRF-Token": getCsrfToken()! } : {}) }, body: JSON.stringify({ is_admin: user.is_admin ? 0 : 1 }) });
     if (res.ok) { revalidator.revalidate(); toast({ title: user.is_admin ? "Admin removed" : "Admin granted" }); }
   };
 
   const toggleActive = async (userId: string) => {
     const user = users.find((u: any) => u.id === userId);
-    const res = await fetch(`/api/admin/users/${userId}`, { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ is_active: user.is_active ? 0 : 1 }) });
+    const res = await fetch(`/api/admin/users/${userId}`, { method: "PATCH", headers: { "Content-Type": "application/json", ...(getCsrfToken() ? { "X-CSRF-Token": getCsrfToken()! } : {}) }, body: JSON.stringify({ is_active: user.is_active ? 0 : 1 }) });
     if (res.ok) { revalidator.revalidate(); toast({ title: user.is_active ? "User deactivated" : "User activated" }); }
   };
 
   const handleDelete = async () => {
     if (!deleteUser) return;
-    const res = await fetch(`/api/admin/users/${deleteUser.id}`, { method: "DELETE" });
+    const res = await fetch(`/api/admin/users/${deleteUser.id}`, { method: "DELETE", headers: { ...(getCsrfToken() ? { "X-CSRF-Token": getCsrfToken()! } : {}) } });
     if (res.ok) { setDeleteUser(null); revalidator.revalidate(); toast({ title: "User deleted" }); }
   };
 
@@ -131,7 +132,7 @@ function UsersTab({ users, allUploads, currentUserId, toast, revalidator }: any)
     const updates: any = {};
     if (editQuota) updates.disk_quota = parseInt(editQuota) * 1024 * 1024;
     if (editMaxUpload) updates.max_upload_size = parseInt(editMaxUpload) * 1024 * 1024;
-    const res = await fetch(`/api/admin/users/${editUser.id}`, { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify(updates) });
+    const res = await fetch(`/api/admin/users/${editUser.id}`, { method: "PATCH", headers: { "Content-Type": "application/json", ...(getCsrfToken() ? { "X-CSRF-Token": getCsrfToken()! } : {}) }, body: JSON.stringify(updates) });
     if (res.ok) { setEditUser(null); revalidator.revalidate(); toast({ title: "User settings updated" }); }
   };
 
@@ -267,7 +268,7 @@ function SettingsTab({ systemSettings, toast, revalidator }: any) {
 
   const save = async () => {
     const res = await fetch("/api/admin/system-settings", {
-      method: "PUT", headers: { "Content-Type": "application/json" },
+      method: "PUT", headers: { "Content-Type": "application/json", ...(getCsrfToken() ? { "X-CSRF-Token": getCsrfToken()! } : {}) },
       body: JSON.stringify({
         site_name: siteName, site_description: siteDesc, base_url: baseUrl || null,
         allow_registration: allowReg ? 1 : 0, allow_login: allowLogin ? 1 : 0,
@@ -335,7 +336,7 @@ function DesignTab({ systemSettings, toast, revalidator }: any) {
     try {
       const formData = new FormData();
       formData.append("file", file);
-      const res = await fetch("/api/logo", { method: "POST", body: formData });
+      const res = await fetch("/api/logo", { method: "POST", body: formData, headers: { ...(getCsrfToken() ? { "X-CSRF-Token": getCsrfToken()! } : {}) } });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error);
       setLogoUrl(data.url);
@@ -347,7 +348,7 @@ function DesignTab({ systemSettings, toast, revalidator }: any) {
 
   const save = async () => {
     const res = await fetch("/api/admin/system-settings", {
-      method: "PUT", headers: { "Content-Type": "application/json" },
+      method: "PUT", headers: { "Content-Type": "application/json", ...(getCsrfToken() ? { "X-CSRF-Token": getCsrfToken()! } : {}) },
       body: JSON.stringify({ dashboard_layout: layout, logo_url: logoUrl || null, primary_color: primaryColor, background_pattern: bgPattern }),
     });
     if (res.ok) { revalidator.revalidate(); toast({ title: "Design saved! Reload to see changes." }); }

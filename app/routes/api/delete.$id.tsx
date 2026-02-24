@@ -2,9 +2,14 @@ import { getSession } from "~/.server/session";
 import { queryOne, execute } from "~/.server/db";
 import { getStorage } from "~/.server/storage";
 import { rateLimit } from "~/.server/rate-limit";
+import { validateCsrf } from "~/.server/csrf";
 
 export async function action({ request, params }: { request: Request; params: { id: string } }) {
   if (request.method !== "DELETE") return new Response("Method not allowed", { status: 405 });
+
+  // CSRF protection
+  const csrfError = await validateCsrf(request);
+  if (csrfError) return csrfError;
 
   // Rate limit: 60 deletes per 10 minutes
   const limited = rateLimit("delete", request, 60, 10 * 60 * 1000);

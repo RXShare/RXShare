@@ -2,6 +2,7 @@ import { getSession } from "~/.server/session";
 import { isAdmin } from "~/.server/auth";
 import { queryOne, execute } from "~/.server/db";
 import { rateLimit } from "~/.server/rate-limit";
+import { validateCsrf } from "~/.server/csrf";
 
 export async function loader({ request }: { request: Request }) {
   const session = await getSession(request);
@@ -12,6 +13,10 @@ export async function loader({ request }: { request: Request }) {
 
 export async function action({ request }: { request: Request }) {
   if (request.method !== "PUT") return new Response("Method not allowed", { status: 405 });
+
+  // CSRF protection
+  const csrfError = await validateCsrf(request);
+  if (csrfError) return csrfError;
 
   // Rate limit: 30 settings changes per 10 minutes
   const limited = rateLimit("admin-settings", request, 30, 10 * 60 * 1000);

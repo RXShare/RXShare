@@ -25,21 +25,23 @@ export async function mysqlExec(sql: string): Promise<void> {
 
 export function createMysqlAdapter(): DatabaseAdapter {
   const p = getPool();
+  const syncError = (method: string) =>
+    new Error(`MySQL adapter: ${method}() is not available synchronously. MySQL support is experimental — all route handlers currently use synchronous DB calls which only work with SQLite. Use initDatabaseAsync() for migrations.`);
   return {
     query<T = any>(sql: string, params: any[] = []): T[] {
-      throw new Error("MySQL adapter requires async — use initDatabaseAsync");
+      throw syncError("query");
     },
     queryOne<T = any>(sql: string, params: any[] = []): T | undefined {
-      throw new Error("MySQL adapter requires async — use initDatabaseAsync");
+      throw syncError("queryOne");
     },
     execute(sql: string, params: any[] = []): DbResult {
-      throw new Error("MySQL adapter requires async");
+      throw syncError("execute");
     },
     exec(sql: string): void {
-      throw new Error("MySQL adapter requires async");
+      throw syncError("exec");
     },
     transaction<T>(fn: () => T): T {
-      throw new Error("MySQL adapter requires async");
+      throw syncError("transaction");
     },
     close(): void { if (pool) { pool.end(); pool = null; } },
   };

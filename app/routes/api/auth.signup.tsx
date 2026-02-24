@@ -4,9 +4,14 @@ import { createSessionHeaders } from "~/.server/session";
 import { execute, queryOne } from "~/.server/db";
 import { markSetupDone, isFirstRun } from "~/.server/db";
 import { rateLimit } from "~/.server/rate-limit";
+import { validateCsrf } from "~/.server/csrf";
 
 export async function action({ request }: { request: Request }) {
   if (request.method !== "POST") return new Response("Method not allowed", { status: 405 });
+
+  // CSRF protection
+  const csrfError = await validateCsrf(request);
+  if (csrfError) return csrfError;
 
   // Rate limit: 5 signups per 30 minutes per IP
   const limited = rateLimit("signup", request, 5, 30 * 60 * 1000);

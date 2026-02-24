@@ -1,7 +1,7 @@
 import { useState, useRef, useCallback } from "react";
 import { useLoaderData, useRevalidator, useOutletContext } from "react-router";
 import { getSession } from "~/.server/session";
-import { query, queryOne } from "~/.server/db";
+import { query, queryOne, execute } from "~/.server/db";
 import { formatFileSize, formatRelativeDate, getMimeCategory } from "~/lib/utils-format";
 import { cn } from "~/lib/utils";
 import { useToast } from "~/components/ui/use-toast";
@@ -10,6 +10,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from "~/components/u
 import {
   DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger,
 } from "~/components/ui/dropdown-menu";
+import { getCsrfToken } from "~/lib/csrf";
 
 export async function loader({ request }: { request: Request }) {
   const session = await getSession(request);
@@ -17,6 +18,16 @@ export async function loader({ request }: { request: Request }) {
   const uploads = query<any>("SELECT * FROM uploads WHERE user_id = ? ORDER BY created_at DESC", [session.user.id]);
   const settings = queryOne<any>("SELECT * FROM user_settings WHERE user_id = ?", [session.user.id]);
   const systemSettings = queryOne<any>("SELECT * FROM system_settings LIMIT 1");
+
+  // Reconcile disk_used with actual upload sizes to self-heal any drift
+  if (settings) {
+    const actual = uploads.reduce((acc: number, u: any) => acc + u.file_size, 0);
+    if (settings.disk_used !== actual) {
+      execute("UPDATE user_settings SET disk_used = ? WHERE user_id = ?", [actual, session.user.id]);
+      settings.disk_used = actual;
+    }
+  }
+
   return { uploads, settings, systemSettings };
 }
 
@@ -56,7 +67,10 @@ export default function UploadsPage() {
         xhr.upload.addEventListener("progress", (e) => { if (e.lengthComputable) setUploadProgress((e.loaded / e.total) * 100); });
         xhr.addEventListener("load", () => { if (xhr.status >= 200 && xhr.status < 300) resolve(); else reject(new Error(JSON.parse(xhr.responseText)?.error || "Upload failed")); });
         xhr.addEventListener("error", () => reject(new Error("Upload failed")));
-        xhr.open("POST", "/api/upload"); xhr.send(formData);
+        xhr.open("POST", "/api/upload");
+        const csrfToken = getCsrfToken();
+        if (csrfToken) xhr.setRequestHeader("X-CSRF-Token", csrfToken);
+        xhr.send(formData);
       });
       revalidator.revalidate(); toast({ title: "File uploaded!", description: file.name });
     } catch (err: any) { toast({ title: "Upload failed", description: err.message, variant: "destructive" }); }
@@ -73,11 +87,11 @@ export default function UploadsPage() {
     navigator.clipboard.writeText(`${base}/v/${fileName}`); toast({ title: "Link copied!" });
   };
   const toggleVisibility = async (upload: any) => {
-    const res = await fetch(`/api/uploads/${upload.id}`, { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ is_public: upload.is_public ? 0 : 1 }) });
+    const res = await fetch(`/api/uploads/${upload.id}`, { method: "PATCH", headers: { "Content-Type": "application/json", ...(getCsrfToken() ? { "X-CSRF-Token": getCsrfToken()! } : {}) }, body: JSON.stringify({ is_public: upload.is_public ? 0 : 1 }) });
     if (res.ok) { revalidator.revalidate(); toast({ title: upload.is_public ? "Made private" : "Made public" }); }
   };
   const deleteUpload = async (upload: any) => {
-    const res = await fetch(`/api/delete/${upload.id}`, { method: "DELETE" });
+    const res = await fetch(`/api/delete/${upload.id}`, { method: "DELETE", headers: { ...(getCsrfToken() ? { "X-CSRF-Token": getCsrfToken()! } : {}) } });
     if (res.ok) { revalidator.revalidate(); toast({ title: "File deleted" }); }
   };
 

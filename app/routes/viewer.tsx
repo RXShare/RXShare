@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useLoaderData } from "react-router";
 import { queryOne, execute } from "~/.server/db";
 import { getBaseUrl } from "~/.server/base-url";
@@ -115,10 +115,13 @@ export default function Viewer() {
 
 function TextViewer({ url }: { url: string }) {
   const [content, setContent] = useState<string | null>(null);
-  const [loaded, setLoaded] = useState(false);
-  if (typeof window !== "undefined" && !loaded) {
-    setLoaded(true);
-    fetch(url).then(r => r.text()).then(t => setContent(t.slice(0, 50000))).catch(() => setContent("Failed to load"));
-  }
+  useEffect(() => {
+    let cancelled = false;
+    fetch(url)
+      .then(r => r.text())
+      .then(t => { if (!cancelled) setContent(t.slice(0, 50000)); })
+      .catch(() => { if (!cancelled) setContent("Failed to load"); });
+    return () => { cancelled = true; };
+  }, [url]);
   return <pre className="p-4 text-sm overflow-auto max-h-[calc(100vh-8rem)] whitespace-pre-wrap font-mono text-gray-300">{content || "Loading..."}</pre>;
 }

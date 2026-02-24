@@ -51,6 +51,7 @@ export async function initDatabaseAsync(): Promise<void> {
     const { mysqlExec } = await import("./mysql");
     for (const sql of getMigrationSQL("mysql")) await mysqlExec(sql);
     for (const sql of getIndexSQL()) { try { await mysqlExec(sql); } catch {} }
+    for (const sql of getMigrationUpdates()) { try { await mysqlExec(sql); } catch {} }
     initialized = true;
   } else {
     await initDatabase();

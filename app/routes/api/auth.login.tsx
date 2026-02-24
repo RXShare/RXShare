@@ -1,9 +1,14 @@
 import { authenticateUser, generateToken } from "~/.server/auth";
 import { createSessionHeaders } from "~/.server/session";
 import { rateLimit } from "~/.server/rate-limit";
+import { validateCsrf } from "~/.server/csrf";
 
 export async function action({ request }: { request: Request }) {
   if (request.method !== "POST") return new Response("Method not allowed", { status: 405 });
+
+  // CSRF protection
+  const csrfError = await validateCsrf(request);
+  if (csrfError) return csrfError;
 
   // Rate limit: 10 login attempts per 15 minutes per IP
   const limited = rateLimit("login", request, 10, 15 * 60 * 1000);

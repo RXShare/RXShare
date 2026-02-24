@@ -4,6 +4,7 @@ import { query, queryOne, execute } from "~/.server/db";
 import { generateToken } from "~/lib/utils-format";
 import { hashApiToken } from "~/.server/auth";
 import { rateLimit } from "~/.server/rate-limit";
+import { validateCsrf } from "~/.server/csrf";
 
 export async function loader({ request }: { request: Request }) {
   const session = await getSession(request);
@@ -13,6 +14,10 @@ export async function loader({ request }: { request: Request }) {
 }
 
 export async function action({ request }: { request: Request }) {
+  // CSRF protection
+  const csrfError = await validateCsrf(request);
+  if (csrfError) return csrfError;
+
   const session = await getSession(request);
   if (!session) return Response.json({ error: "Unauthorized" }, { status: 401 });
 

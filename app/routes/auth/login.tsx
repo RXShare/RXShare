@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
 import { useNavigate, Link } from "react-router";
 import { useToast } from "~/components/ui/use-toast";
+import { getCsrfToken } from "~/lib/csrf";
 
 const DEFAULT_LOGO = "https://cdn.rxss.click/rexsystems/logo-transparent.svg";
 
@@ -38,7 +39,7 @@ export default function Login() {
     setLoading(true);
     try {
       const res = await fetch("/api/auth/login", {
-        method: "POST", headers: { "Content-Type": "application/json" },
+        method: "POST", headers: { "Content-Type": "application/json", ...(getCsrfToken() ? { "X-CSRF-Token": getCsrfToken()! } : {}) },
         body: JSON.stringify({ email, password }),
       });
       const data = await res.json();

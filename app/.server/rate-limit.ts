@@ -7,7 +7,7 @@ interface RateLimitEntry {
 const stores = new Map<string, Map<string, RateLimitEntry>>();
 
 // Clean up expired entries every 5 minutes
-setInterval(() => {
+const cleanupInterval = setInterval(() => {
   const now = Date.now();
   for (const [, store] of stores) {
     for (const [key, entry] of store) {
@@ -15,6 +15,9 @@ setInterval(() => {
     }
   }
 }, 5 * 60 * 1000);
+
+// Allow clean process shutdown
+cleanupInterval.unref();
 
 function getStore(name: string): Map<string, RateLimitEntry> {
   if (!stores.has(name)) stores.set(name, new Map());

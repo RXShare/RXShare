@@ -3,8 +3,13 @@ import { isAdmin } from "~/.server/auth";
 import { queryOne, execute, query } from "~/.server/db";
 import { getStorage } from "~/.server/storage";
 import { rateLimit } from "~/.server/rate-limit";
+import { validateCsrf } from "~/.server/csrf";
 
 export async function action({ request, params }: { request: Request; params: { userId: string } }) {
+  // CSRF protection
+  const csrfError = await validateCsrf(request);
+  if (csrfError) return csrfError;
+
   const session = await getSession(request);
   if (!session || !isAdmin(session.user.id)) return Response.json({ error: "Forbidden" }, { status: 403 });
 
