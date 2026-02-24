@@ -131,6 +131,8 @@ export function getMigrationUpdates(): string[] {
     "ALTER TABLE uploads ADD COLUMN description TEXT",
     // ShareX auto-folder name
     "ALTER TABLE user_settings ADD COLUMN sharex_folder_name TEXT DEFAULT 'ShareX'",
+    // External URL support for short links
+    "ALTER TABLE short_links ADD COLUMN external_url TEXT",
   ];
 }
 
