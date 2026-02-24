@@ -1,10 +1,12 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useLoaderData } from "react-router";
 import { queryOne, execute } from "~/.server/db";
 import { getSession } from "~/.server/session";
 import { getBaseUrl } from "~/.server/base-url";
 import { getMimeCategory, formatFileSize } from "~/lib/utils-format";
 import { Icon } from "~/components/Icon";
+import { codeToHtml } from "shiki";
+import QRCode from "qrcode";
 
 export async function loader({ params, request }: { params: { fileName: string }; request: Request }) {
   const upload = queryOne<any>("SELECT u.*, us.embed_title, us.embed_description, us.embed_color, us.custom_path, usr.username FROM uploads u LEFT JOIN user_settings us ON u.user_id = us.user_id LEFT JOIN users usr ON u.user_id = usr.id WHERE u.file_name = ?", [params.fileName]);
@@ -100,6 +102,24 @@ export default function Viewer() {
   const fileUrl = `/api/files/${upload.file_path}`;
   const patClass = `bg-pattern-${backgroundPattern}`;
 
+  const [showQr, setShowQr] = useState(false);
+  const [qrDataUrl, setQrDataUrl] = useState("");
+  const qrRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const shareUrl = `${data.baseUrl}/v/${upload.file_name}`;
+    QRCode.toDataURL(shareUrl, { width: 200, margin: 1, color: { dark: "#ffffff", light: "#00000000" } }).then(setQrDataUrl);
+  }, [data.baseUrl, upload.file_name]);
+
+  useEffect(() => {
+    if (!showQr) return;
+    const handleClick = (e: MouseEvent) => {
+      if (qrRef.current && !qrRef.current.contains(e.target as Node)) setShowQr(false);
+    };
+    document.addEventListener("mousedown", handleClick);
+    return () => document.removeEventListener("mousedown", handleClick);
+  }, [showQr]);
+
   return (
     <div className="min-h-screen flex flex-col relative">
       <div className={`fixed inset-0 ${patClass} opacity-40 pointer-events-none`} />
@@ -115,6 +135,9 @@ export default function Viewer() {
               <span>•</span>
               <Icon name="download" className="text-sm" /> {upload.downloads || 0} downloads
             </p>
+            {upload.description && (
+              <p className="text-xs text-gray-400 mt-0.5">{upload.description}</p>
+            )}
           </div>
           <div className="flex gap-2 shrink-0">
             <button onClick={() => window.history.back()}
@@ -127,6 +150,18 @@ export default function Viewer() {
               <Icon name="open_in_new" className="text-lg" />
               <span className="hidden sm:inline">Raw</span>
             </a>
+            <div className="relative" ref={qrRef}>
+              <button onClick={() => setShowQr(v => !v)}
+                className="flex items-center gap-1.5 px-3 py-2 text-sm text-gray-300 bg-white/5 hover:bg-white/10 border border-white/10 rounded-lg transition-colors">
+                <Icon name="qr_code_2" className="text-lg" />
+                <span className="hidden sm:inline">QR</span>
+              </button>
+              {showQr && qrDataUrl && (
+                <div className="absolute right-0 top-full mt-2 p-3 glass-card rounded-xl border border-white/10 shadow-glow-card z-50">
+                  <img src={qrDataUrl} alt="QR Code" className="w-[200px] h-[200px]" />
+                </div>
+              )}
+            </div>
             <a href={fileUrl} download={upload.original_name}
               className="flex items-center gap-1.5 px-3 py-2 text-sm text-white bg-primary hover:bg-[var(--primary-hover)] rounded-lg shadow-glow-primary transition-all">
               <Icon name="download" className="text-lg" />
@@ -154,7 +189,7 @@ export default function Viewer() {
             {category === "pdf" && (
               <iframe src={fileUrl} className="w-full h-[calc(100vh-8rem)]" />
             )}
-            {(category === "text" || category === "code") && <TextViewer url={fileUrl} />}
+            {(category === "text" || category === "code") && <TextViewer url={fileUrl} fileName={upload.original_name} />}
             {category === "other" && (
               <div className="text-center py-16">
                 <Icon name="description" className="text-6xl text-gray-600 mb-4" />
@@ -172,8 +207,10 @@ export default function Viewer() {
   );
 }
 
-function TextViewer({ url }: { url: string }) {
+function TextViewer({ url, fileName }: { url: string; fileName: string }) {
   const [content, setContent] = useState<string | null>(null);
+  const [highlightedHtml, setHighlightedHtml] = useState<string | null>(null);
+
   useEffect(() => {
     let cancelled = false;
     fetch(url)
@@ -182,7 +219,41 @@ function TextViewer({ url }: { url: string }) {
       .catch(() => { if (!cancelled) setContent("Failed to load"); });
     return () => { cancelled = true; };
   }, [url]);
-  return <pre className="p-4 text-sm overflow-auto max-h-[calc(100vh-8rem)] whitespace-pre-wrap font-mono text-gray-300">{content || "Loading..."}</pre>;
+
+  useEffect(() => {
+    if (!content || content === "Failed to load") return;
+    let cancelled = false;
+    const ext = fileName.split(".").pop()?.toLowerCase() || "text";
+    const langMap: Record<string, string> = {
+      js: "javascript", ts: "typescript", tsx: "tsx", jsx: "jsx",
+      py: "python", rb: "ruby", rs: "rust", go: "go", java: "java",
+      c: "c", cpp: "cpp", h: "c", hpp: "cpp", cs: "csharp",
+      php: "php", sh: "bash", bash: "bash", zsh: "bash",
+      json: "json", yaml: "yaml", yml: "yaml", toml: "toml",
+      xml: "xml", html: "html", css: "css", scss: "scss",
+      sql: "sql", md: "markdown", kt: "kotlin", swift: "swift",
+      lua: "lua", r: "r", pl: "perl", ex: "elixir", zig: "zig",
+      dockerfile: "dockerfile", makefile: "makefile",
+    };
+    const lang = langMap[ext] || ext;
+    codeToHtml(content, { lang, theme: "tokyo-night" })
+      .then(html => { if (!cancelled) setHighlightedHtml(html); })
+      .catch(() => { /* fall back to plain pre */ });
+    return () => { cancelled = true; };
+  }, [content, fileName]);
+
+  if (!content) return <pre className="p-4 text-sm overflow-auto max-h-[calc(100vh-8rem)] whitespace-pre-wrap font-mono text-gray-300">Loading...</pre>;
+
+  if (highlightedHtml) {
+    return (
+      <div
+        className="p-4 text-sm overflow-auto max-h-[calc(100vh-8rem)] [&_pre]:!bg-transparent [&_code]:!font-mono"
+        dangerouslySetInnerHTML={{ __html: highlightedHtml }}
+      />
+    );
+  }
+
+  return <pre className="p-4 text-sm overflow-auto max-h-[calc(100vh-8rem)] whitespace-pre-wrap font-mono text-gray-300">{content}</pre>;
 }
 
 function PasswordGate({ fileName, originalName, backgroundPattern }: { fileName: string; originalName: string; backgroundPattern: string }) {

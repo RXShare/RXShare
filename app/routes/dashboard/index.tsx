@@ -11,13 +11,16 @@ import {
   DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger,
 } from "~/components/ui/dropdown-menu";
 import { getCsrfToken } from "~/lib/csrf";
+import { isAdmin } from "~/.server/auth";
+import { getFeatureFlagsMap } from "~/.server/features";
 
 export async function loader({ request }: { request: Request }) {
   const session = await getSession(request);
   if (!session) throw new Response(null, { status: 302, headers: { Location: "/auth/login" } });
-  const uploads = query<any>("SELECT * FROM uploads WHERE user_id = ? ORDER BY created_at DESC", [session.user.id]);
+  const uploads = query<any>("SELECT * FROM uploads WHERE user_id = ? AND deleted_at IS NULL ORDER BY created_at DESC", [session.user.id]);
   const settings = queryOne<any>("SELECT * FROM user_settings WHERE user_id = ?", [session.user.id]);
   const systemSettings = queryOne<any>("SELECT * FROM system_settings LIMIT 1");
+  const featureFlags = getFeatureFlagsMap(isAdmin(session.user.id));
 
   // Reconcile disk_used with actual upload sizes to self-heal any drift
   if (settings) {
@@ -28,11 +31,11 @@ export async function loader({ request }: { request: Request }) {
     }
   }
 
-  return { uploads, settings, systemSettings };
+  return { uploads, settings, systemSettings, featureFlags };
 }
 
 export default function UploadsPage() {
-  const { uploads, settings, systemSettings } = useLoaderData<typeof loader>();
+  const { uploads, settings, systemSettings, featureFlags } = useLoaderData<typeof loader>();
   const { user } = useOutletContext<any>();
   const { toast } = useToast();
   const revalidator = useRevalidator();
@@ -48,10 +51,14 @@ export default function UploadsPage() {
   const [settingsFile, setSettingsFile] = useState<any>(null);
   const [filePassword, setFilePassword] = useState("");
   const [fileExpiry, setFileExpiry] = useState("");
+  const [fileDescription, setFileDescription] = useState("");
   const [folders, setFolders] = useState<any[]>([]);
   const [newFolderName, setNewFolderName] = useState("");
   const [activeFolder, setActiveFolder] = useState<string | null>(null);
   const [focusIndex, setFocusIndex] = useState(-1);
+  const [filterType, setFilterType] = useState<string>("");
+  const [filterStatus, setFilterStatus] = useState<string>("");
+  const [showFilters, setShowFilters] = useState(false);
 
   const toggleSelect = (id: string) => {
     setSelectedIds(prev => {
@@ -88,7 +95,9 @@ export default function UploadsPage() {
   const filteredUploads = uploads.filter((u: any) => {
     const matchesSearch = u.original_name.toLowerCase().includes(search.toLowerCase()) || u.file_name.toLowerCase().includes(search.toLowerCase());
     const matchesFolder = !activeFolder || u.folder_id === activeFolder;
-    return matchesSearch && matchesFolder;
+    const matchesType = !filterType || getMimeCategory(u.mime_type) === filterType;
+    const matchesStatus = !filterStatus || (filterStatus === "public" ? u.is_public : !u.is_public);
+    return matchesSearch && matchesFolder && matchesType && matchesStatus;
   });
 
   const totalSize = uploads.reduce((acc: number, u: any) => acc + u.file_size, 0);
@@ -178,12 +187,13 @@ export default function UploadsPage() {
     if (fileExpiry) updates.expires_at = new Date(Date.now() + parseInt(fileExpiry) * 3600000).toISOString();
     if (fileExpiry === "0") updates.expires_at = null;
     if (filePassword !== undefined) updates.password = filePassword || null;
+    if (fileDescription !== undefined) updates.description = fileDescription || null;
     const res = await fetch(`/api/uploads/${settingsFile.id}`, {
       method: "PATCH",
       headers: { "Content-Type": "application/json", ...(getCsrfToken() ? { "X-CSRF-Token": getCsrfToken()! } : {}) },
       body: JSON.stringify(updates),
     });
-    if (res.ok) { setSettingsFile(null); setFilePassword(""); setFileExpiry(""); revalidator.revalidate(); toast({ title: "File settings updated" }); }
+    if (res.ok) { setSettingsFile(null); setFilePassword(""); setFileExpiry(""); setFileDescription(""); revalidator.revalidate(); toast({ title: "File settings updated" }); }
   };
 
   const createFolder = async () => {
@@ -232,6 +242,19 @@ export default function UploadsPage() {
   const copyLink = (fileName: string) => {
     const base = systemSettings?.base_url || window.location.origin;
     navigator.clipboard.writeText(`${base}/v/${fileName}`); toast({ title: "Link copied!" });
+  };
+  const createShortLink = async (uploadId: string, fileName: string) => {
+    const res = await fetch("/api/short-links", {
+      method: "POST",
+      headers: { "Content-Type": "application/json", ...(getCsrfToken() ? { "X-CSRF-Token": getCsrfToken()! } : {}) },
+      body: JSON.stringify({ upload_id: uploadId }),
+    });
+    if (res.ok) {
+      const d = await res.json();
+      const base = systemSettings?.base_url || window.location.origin;
+      navigator.clipboard.writeText(`${base}/s/${d.code}`);
+      toast({ title: "Short link copied!" });
+    }
   };
   const toggleVisibility = async (upload: any) => {
     const res = await fetch(`/api/uploads/${upload.id}`, { method: "PATCH", headers: { "Content-Type": "application/json", ...(getCsrfToken() ? { "X-CSRF-Token": getCsrfToken()! } : {}) }, body: JSON.stringify({ is_public: upload.is_public ? 0 : 1 }) });
@@ -283,6 +306,10 @@ export default function UploadsPage() {
             </div>
           </div>
         </div>
+        <button onClick={() => setShowFilters(!showFilters)}
+          className={cn("ml-2 p-3 rounded-xl border transition-colors", showFilters || filterType || filterStatus ? "bg-primary/20 text-primary border-primary/30" : "bg-[#0a0a0a]/60 text-gray-500 border-white/10 hover:text-gray-300")}>
+          <Icon name="tune" className="text-lg" />
+        </button>
         <div className="flex items-center gap-4 ml-6">
           <button onClick={() => fileInputRef.current?.click()}
             className="bg-primary hover:bg-[var(--primary-hover)] text-white px-5 py-2.5 rounded-lg text-sm font-bold transition-all shadow-glow-primary flex items-center gap-2 hover:scale-105">
@@ -290,6 +317,34 @@ export default function UploadsPage() {
           </button>
         </div>
       </header>
+      {showFilters && (
+        <div className="flex items-center gap-3 flex-wrap">
+          <select value={filterType} onChange={(e) => setFilterType(e.target.value)}
+            className="px-3 py-2 border border-white/10 rounded-lg bg-[#0a0a0a] text-gray-300 focus:outline-none focus:ring-1 focus:ring-primary text-sm">
+            <option value="">All Types</option>
+            <option value="image">Images</option>
+            <option value="video">Video</option>
+            <option value="audio">Audio</option>
+            <option value="text">Text</option>
+            <option value="code">Code</option>
+            <option value="pdf">PDF</option>
+            <option value="other">Other</option>
+          </select>
+          <select value={filterStatus} onChange={(e) => setFilterStatus(e.target.value)}
+            className="px-3 py-2 border border-white/10 rounded-lg bg-[#0a0a0a] text-gray-300 focus:outline-none focus:ring-1 focus:ring-primary text-sm">
+            <option value="">All Status</option>
+            <option value="public">Public</option>
+            <option value="private">Private</option>
+          </select>
+          {(filterType || filterStatus) && (
+            <button onClick={() => { setFilterType(""); setFilterStatus(""); }}
+              className="px-3 py-2 text-xs text-gray-400 hover:text-white hover:bg-white/5 rounded-lg border border-white/10 transition-colors flex items-center gap-1">
+              <Icon name="close" className="text-sm" /> Clear filters
+            </button>
+          )}
+          <span className="text-xs text-gray-500 ml-auto">{filteredUploads.length} files</span>
+        </div>
+      )}
       <input ref={fileInputRef} type="file" className="hidden" onChange={(e) => { const f = e.target.files?.[0]; if (f) handleUpload(f); e.target.value = ""; }} />
 
       {/* Storage + Upload zone — exact Stitch grid */}
@@ -366,7 +421,7 @@ export default function UploadsPage() {
       </div>
 
       {/* Folders */}
-      {folders.length > 0 && (
+      {featureFlags.folders && folders.length > 0 && (
         <div className="flex items-center gap-3 overflow-x-auto pb-1">
           <button onClick={() => setActiveFolder(null)}
             className={cn("flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-medium transition-all shrink-0",
@@ -396,7 +451,7 @@ export default function UploadsPage() {
           </div>
         </div>
       )}
-      {folders.length === 0 && (
+      {featureFlags.folders && folders.length === 0 && (
         <div className="flex items-center gap-2">
           <input value={newFolderName} onChange={(e) => setNewFolderName(e.target.value)} placeholder="Create a folder..."
             onKeyDown={(e) => e.key === "Enter" && createFolder()}
@@ -414,10 +469,10 @@ export default function UploadsPage() {
           {selectedIds.size > 0 && (
             <div className="flex items-center gap-2 ml-4">
               <span className="text-xs text-gray-400">{selectedIds.size} selected</span>
-              <button onClick={downloadZip} disabled={zipping}
+              {featureFlags.zip_download && <button onClick={downloadZip} disabled={zipping}
                 className="flex items-center gap-1.5 px-3 py-1.5 text-xs text-white bg-primary hover:bg-[var(--primary-hover)] rounded-lg shadow-glow-primary transition-all disabled:opacity-50">
                 <Icon name="folder_zip" className="text-sm" /> {zipping ? "Zipping..." : "Download Zip"}
-              </button>
+              </button>}
               <button onClick={() => setSelectedIds(new Set())}
                 className="flex items-center gap-1 px-2 py-1.5 text-xs text-gray-400 hover:text-white hover:bg-white/5 rounded-lg transition-colors">
                 <Icon name="close" className="text-sm" /> Clear
@@ -477,14 +532,17 @@ export default function UploadsPage() {
                       <DropdownMenuItem onClick={() => copyLink(upload.file_name)} className="flex items-center gap-3 px-3 py-2 text-sm text-gray-300 hover:text-white hover:bg-white/5 rounded-lg">
                         <Icon name="link" className="text-lg" /> Copy link
                       </DropdownMenuItem>
+                      {featureFlags.short_links && <DropdownMenuItem onClick={() => createShortLink(upload.id, upload.file_name)} className="flex items-center gap-3 px-3 py-2 text-sm text-gray-300 hover:text-white hover:bg-white/5 rounded-lg">
+                        <Icon name="link" className="text-lg" /> Short Link
+                      </DropdownMenuItem>}
                       <DropdownMenuItem onClick={() => toggleVisibility(upload)} className="flex items-center gap-3 px-3 py-2 text-sm text-gray-300 hover:text-white hover:bg-white/5 rounded-lg">
                         <Icon name={upload.is_public ? "visibility_off" : "visibility"} className="text-lg" />
                         {upload.is_public ? "Make private" : "Make public"}
                       </DropdownMenuItem>
-                      <DropdownMenuItem onClick={() => { setSettingsFile(upload); setFilePassword(""); setFileExpiry(""); }} className="flex items-center gap-3 px-3 py-2 text-sm text-gray-300 hover:text-white hover:bg-white/5 rounded-lg">
+                      <DropdownMenuItem onClick={() => { setSettingsFile(upload); setFilePassword(""); setFileExpiry(""); setFileDescription(upload.description || ""); }} className="flex items-center gap-3 px-3 py-2 text-sm text-gray-300 hover:text-white hover:bg-white/5 rounded-lg">
                         <Icon name="settings" className="text-lg" /> Settings
                       </DropdownMenuItem>
-                      {folders.length > 0 && (
+                      {featureFlags.folders && folders.length > 0 && (
                         <DropdownMenuItem onClick={() => moveToFolder(upload.id, upload.folder_id ? null : folders[0].id)} className="flex items-center gap-3 px-3 py-2 text-sm text-gray-300 hover:text-white hover:bg-white/5 rounded-lg">
                           <Icon name="folder" className="text-lg" /> {upload.folder_id ? "Remove from folder" : "Move to folder"}
                         </DropdownMenuItem>
@@ -593,11 +651,14 @@ export default function UploadsPage() {
                         <DropdownMenuItem onClick={() => copyLink(upload.file_name)} className="flex items-center gap-3 px-3 py-2 text-sm text-gray-300 hover:text-white hover:bg-white/5 rounded-lg">
                           <Icon name="link" className="text-lg" /> Copy link
                         </DropdownMenuItem>
+                        {featureFlags.short_links && <DropdownMenuItem onClick={() => createShortLink(upload.id, upload.file_name)} className="flex items-center gap-3 px-3 py-2 text-sm text-gray-300 hover:text-white hover:bg-white/5 rounded-lg">
+                          <Icon name="link" className="text-lg" /> Short Link
+                        </DropdownMenuItem>}
                         <DropdownMenuItem onClick={() => toggleVisibility(upload)} className="flex items-center gap-3 px-3 py-2 text-sm text-gray-300 hover:text-white hover:bg-white/5 rounded-lg">
                           <Icon name={upload.is_public ? "visibility_off" : "visibility"} className="text-lg" />
                           {upload.is_public ? "Make private" : "Make public"}
                         </DropdownMenuItem>
-                        <DropdownMenuItem onClick={() => { setSettingsFile(upload); setFilePassword(""); setFileExpiry(""); }} className="flex items-center gap-3 px-3 py-2 text-sm text-gray-300 hover:text-white hover:bg-white/5 rounded-lg">
+                        <DropdownMenuItem onClick={() => { setSettingsFile(upload); setFilePassword(""); setFileExpiry(""); setFileDescription(upload.description || ""); }} className="flex items-center gap-3 px-3 py-2 text-sm text-gray-300 hover:text-white hover:bg-white/5 rounded-lg">
                           <Icon name="settings" className="text-lg" /> Settings
                         </DropdownMenuItem>
                         <div className="h-px bg-white/5 my-1" />
@@ -656,7 +717,7 @@ export default function UploadsPage() {
         <DialogContent className="bg-[#141414] border-white/10 max-w-md">
           <DialogHeader><DialogTitle className="text-white truncate">{settingsFile?.original_name}</DialogTitle></DialogHeader>
           <div className="space-y-5">
-            <div className="space-y-2">
+            {featureFlags.file_expiration && <div className="space-y-2">
               <label className="text-sm font-medium text-gray-400 flex items-center gap-2"><Icon name="timer" className="text-lg" /> Expiration</label>
               <select value={fileExpiry} onChange={(e) => setFileExpiry(e.target.value)}
                 className="block w-full px-4 py-2.5 border border-white/10 rounded-lg bg-[#0a0a0a] text-gray-300 focus:outline-none focus:ring-1 focus:ring-primary text-sm">
@@ -668,14 +729,14 @@ export default function UploadsPage() {
                 <option value="0">Remove expiration</option>
               </select>
               {settingsFile?.expires_at && <p className="text-xs text-yellow-500">Currently expires: {new Date(settingsFile.expires_at).toLocaleString()}</p>}
-            </div>
-            <div className="space-y-2">
+            </div>}
+            {featureFlags.password_protection && <div className="space-y-2">
               <label className="text-sm font-medium text-gray-400 flex items-center gap-2"><Icon name="lock" className="text-lg" /> Password Protection</label>
               <input type="password" value={filePassword} onChange={(e) => setFilePassword(e.target.value)} placeholder={settingsFile?.password_hash ? "Change password (leave empty to keep)" : "Set password (optional)"}
                 className="block w-full px-4 py-2.5 border border-white/10 rounded-lg bg-[#0a0a0a] text-gray-300 placeholder-gray-600 focus:outline-none focus:ring-1 focus:ring-primary text-sm" />
               {settingsFile?.password_hash && <p className="text-xs text-primary">This file is password protected</p>}
-            </div>
-            {folders.length > 0 && (
+            </div>}
+            {featureFlags.folders && folders.length > 0 && (
               <div className="space-y-2">
                 <label className="text-sm font-medium text-gray-400 flex items-center gap-2"><Icon name="folder" className="text-lg" /> Folder</label>
                 <select value={settingsFile?.folder_id || ""} onChange={(e) => moveToFolder(settingsFile.id, e.target.value || null)}
@@ -685,6 +746,11 @@ export default function UploadsPage() {
                 </select>
               </div>
             )}
+            {featureFlags.file_notes && <div className="space-y-2">
+              <label className="text-sm font-medium text-gray-400 flex items-center gap-2"><Icon name="notes" className="text-lg" /> Description</label>
+              <textarea value={fileDescription} onChange={(e) => setFileDescription(e.target.value)} placeholder="Add a note or description..."
+                className="block w-full px-4 py-2.5 border border-white/10 rounded-lg bg-[#0a0a0a] text-gray-300 placeholder-gray-600 focus:outline-none focus:ring-1 focus:ring-primary text-sm resize-none" rows={3} />
+            </div>}
           </div>
           <div className="flex justify-end gap-2 mt-2">
             <button onClick={() => setSettingsFile(null)} className="px-4 py-2 text-sm text-gray-400 border border-white/10 rounded-lg hover:bg-white/5 transition-colors">Cancel</button>

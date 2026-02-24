@@ -1,4 +1,5 @@
 import { nanoid } from "nanoid";
+import crypto from "crypto";
 import { getSession } from "~/.server/session";
 import { queryOne, execute } from "~/.server/db";
 import { getStorage } from "~/.server/storage";
@@ -59,9 +60,17 @@ export async function action({ request }: { request: Request }) {
 
   const storage = await getStorage();
 
-  // Stream file to storage instead of buffering entirely in memory
-  const fileStream = file.stream() as ReadableStream<Uint8Array>;
-  await storage.saveStream(filePath, fileStream);
+  // Read file into buffer to compute SHA-256 hash for duplicate detection
+  const buffer = Buffer.from(await file.arrayBuffer());
+  const fileHash = crypto.createHash("sha256").update(buffer).digest("hex");
+
+  // Check for duplicates for the same user
+  const existing = queryOne<any>("SELECT * FROM uploads WHERE user_id = ? AND file_hash = ? AND deleted_at IS NULL", [user.id, fileHash]);
+  if (existing) {
+    return Response.json({ error: "Duplicate file", existingId: existing.id, existingName: existing.original_name }, { status: 409 });
+  }
+
+  await storage.save(filePath, buffer);
 
   const uploadId = nanoid();
   const now = new Date().toISOString();
@@ -76,8 +85,8 @@ export async function action({ request }: { request: Request }) {
   } catch {}
 
   execute(
-    "INSERT INTO uploads (id, user_id, file_name, original_name, mime_type, file_size, file_path, thumbnail_path, preview_path, is_public, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
-    [uploadId, user.id, fileName, file.name, file.type || "application/octet-stream", file.size, filePath, thumbnailPath, previewPath, settings.default_public ? 1 : 0, now, now]
+    "INSERT INTO uploads (id, user_id, file_name, original_name, mime_type, file_size, file_path, thumbnail_path, preview_path, is_public, file_hash, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+    [uploadId, user.id, fileName, file.name, file.type || "application/octet-stream", file.size, filePath, thumbnailPath, previewPath, settings.default_public ? 1 : 0, fileHash, now, now]
   );
 
   execute("UPDATE user_settings SET disk_used = disk_used + ? WHERE user_id = ?", [file.size, user.id]);

@@ -37,5 +37,8 @@ export async function action({ request, params }: { request: Request; params: { 
   if (body.folder_id !== undefined) {
     execute("UPDATE uploads SET folder_id = ?, updated_at = ? WHERE id = ?", [body.folder_id, now, params.id]);
   }
+  if (body.description !== undefined) {
+    execute("UPDATE uploads SET description = ?, updated_at = ? WHERE id = ?", [body.description || null, now, params.id]);
+  }
   return Response.json({ ok: true });
 }

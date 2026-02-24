@@ -1,9 +1,11 @@
 import bcrypt from "bcryptjs";
 import { queryOne } from "~/.server/db";
 import { rateLimit } from "~/.server/rate-limit";
+import { isFeatureEnabled } from "~/.server/features";
 
 export async function action({ request }: { request: Request }) {
   if (request.method !== "POST") return new Response("Method not allowed", { status: 405 });
+  if (!isFeatureEnabled("password_protection")) return Response.json({ error: "Feature disabled" }, { status: 403 });
 
   const limited = rateLimit("verify-password", request, 20, 10 * 60 * 1000);
   if (limited) return limited;

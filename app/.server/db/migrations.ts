@@ -107,6 +107,7 @@ export function getIndexSQL(): string[] {
     "CREATE INDEX IF NOT EXISTS idx_api_tokens_user_id ON api_tokens(user_id)",
     "CREATE INDEX IF NOT EXISTS idx_users_email ON users(email)",
     "CREATE INDEX IF NOT EXISTS idx_users_username ON users(username)",
+    "CREATE INDEX IF NOT EXISTS idx_uploads_file_hash ON uploads(file_hash)",
   ];
 }
 
@@ -122,6 +123,12 @@ export function getMigrationUpdates(): string[] {
     "ALTER TABLE uploads ADD COLUMN password_hash TEXT",
     // Folder support
     "ALTER TABLE uploads ADD COLUMN folder_id TEXT",
+    // Soft delete (trash)
+    "ALTER TABLE uploads ADD COLUMN deleted_at TEXT",
+    // Duplicate file detection (SHA-256)
+    "ALTER TABLE uploads ADD COLUMN file_hash TEXT",
+    // File notes/description
+    "ALTER TABLE uploads ADD COLUMN description TEXT",
   ];
 }
 
@@ -183,5 +190,25 @@ export function getNewTablesSQL(dbType: DbType): string[] {
     "CREATE INDEX IF NOT EXISTS idx_audit_logs_created_at ON audit_logs(created_at)",
     "CREATE INDEX IF NOT EXISTS idx_audit_logs_user_id ON audit_logs(user_id)",
     "CREATE INDEX IF NOT EXISTS idx_invites_code ON invites(code)",
+    // Short links
+    `CREATE TABLE IF NOT EXISTS short_links (
+      id ${textType} PRIMARY KEY,
+      code ${textType} NOT NULL UNIQUE,
+      upload_id ${textType} NOT NULL,
+      user_id ${textType} NOT NULL,
+      clicks ${intType} NOT NULL DEFAULT 0,
+      created_at ${autoTs},
+      FOREIGN KEY (upload_id) REFERENCES uploads(id) ON DELETE CASCADE,
+      FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+    )`,
+    "CREATE INDEX IF NOT EXISTS idx_short_links_code ON short_links(code)",
+    // Feature flags
+    `CREATE TABLE IF NOT EXISTS feature_flags (
+      key ${textType} PRIMARY KEY,
+      label ${textType} NOT NULL,
+      description ${textType},
+      enabled ${intBool} NOT NULL DEFAULT 1,
+      members_enabled ${intBool} NOT NULL DEFAULT 1
+    )`,
   ];
 }

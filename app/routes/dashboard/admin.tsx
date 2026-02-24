@@ -32,6 +32,7 @@ export default function AdminPage() {
   const totalStorage = users.reduce((acc: number, u: any) => acc + (u.disk_used || 0), 0);
 
   const tabs = [
+    { id: "analytics", label: "Analytics", icon: "analytics" },
     { id: "users", label: "Users", icon: "manage_accounts" },
     { id: "settings", label: "General", icon: "settings" },
     { id: "design", label: "Design", icon: "palette" },
@@ -91,12 +92,14 @@ export default function AdminPage() {
       </div>
 
       {/* Tab content */}
+      {activeTab === "analytics" && <AnalyticsTab />}
       {activeTab === "users" && <UsersTab users={users} allUploads={allUploads} currentUserId={currentUserId} toast={toast} revalidator={revalidator} />}
       {activeTab === "settings" && <SettingsTab systemSettings={systemSettings} toast={toast} revalidator={revalidator} />}
       {activeTab === "design" && <DesignTab systemSettings={systemSettings} toast={toast} revalidator={revalidator} />}
       {activeTab === "audit" && <AuditTab toast={toast} />}
       {activeTab === "webhooks" && <WebhooksTab toast={toast} />}
       {activeTab === "invites" && <InvitesTab toast={toast} systemSettings={systemSettings} />}
+      {activeTab === "features" && <FeaturesTab toast={toast} />}
     </div>
   );
 }
@@ -739,3 +742,276 @@ function InvitesTab({ toast, systemSettings }: any) {
     </div>
   );
 }
+
+function AnalyticsTab() {
+  const [data, setData] = useState<any>(null);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    fetch("/api/admin/analytics")
+      .then((r) => r.json())
+      .then((d) => setData(d))
+      .catch(() => {})
+      .finally(() => setLoading(false));
+  }, []);
+
+  if (loading) {
+    return (
+      <div className="mt-6 flex items-center justify-center py-20">
+        <Icon name="progress_activity" className="text-4xl text-primary animate-spin" />
+      </div>
+    );
+  }
+
+  if (!data) {
+    return (
+      <div className="mt-6 text-center py-20 text-gray-500">
+        Failed to load analytics data.
+      </div>
+    );
+  }
+
+  const {
+    AreaChart, Area, BarChart, Bar, PieChart, Pie, Cell,
+    XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
+  } = require("recharts");
+
+  const COLORS = ["#f97316", "#3b82f6", "#8b5cf6", "#22c55e", "#ec4899"];
+
+  const uploadsPerDay = data.uploadsPerDay || [];
+  const topUploaders = data.topUploaders || [];
+  const typeDistribution = data.typeDistribution || [];
+
+  // Aggregate mime types into categories
+  const typeCategories: Record<string, number> = {};
+  typeDistribution.forEach((t: any) => {
+    const mime = (t.mime_type || "").toLowerCase();
+    let cat = "Other";
+    if (mime.startsWith("image/")) cat = "Image";
+    else if (mime.startsWith("video/")) cat = "Video";
+    else if (mime.startsWith("audio/")) cat = "Audio";
+    else if (mime.startsWith("application/pdf") || mime.startsWith("text/") || mime.includes("document") || mime.includes("spreadsheet") || mime.includes("presentation")) cat = "Document";
+    typeCategories[cat] = (typeCategories[cat] || 0) + t.count;
+  });
+  const pieData = Object.entries(typeCategories).map(([name, value]) => ({ name, value }));
+
+  // Stats for this month
+  const now = new Date();
+  const monthStart = new Date(now.getFullYear(), now.getMonth(), 1).toISOString().slice(0, 10);
+  const uploadsThisMonth = uploadsPerDay
+    .filter((d: any) => d.date >= monthStart)
+    .reduce((acc: number, d: any) => acc + d.count, 0);
+  const storageThisMonth = uploadsPerDay
+    .filter((d: any) => d.date >= monthStart)
+    .reduce((acc: number, d: any) => acc + (d.size || 0), 0);
+
+  const CustomTooltip = ({ active, payload, label }: any) => {
+    if (!active || !payload?.length) return null;
+    return (
+      <div className="bg-[#1a1a1a] border border-white/10 rounded-lg px-3 py-2 text-xs shadow-lg">
+        <p className="text-gray-400 mb-1">{label}</p>
+        {payload.map((p: any, i: number) => (
+          <p key={i} style={{ color: p.color }} className="font-medium">
+            {p.name}: {p.name === "Storage" ? formatFileSize(p.value) : p.value}
+          </p>
+        ))}
+      </div>
+    );
+  };
+
+  return (
+    <div className="mt-6 space-y-6">
+      {/* Stat cards */}
+      <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-6">
+        {[
+          { icon: "visibility", label: "Total Views", value: (data.totalViews ?? 0).toLocaleString(), color: "text-primary" },
+          { icon: "download", label: "Total Downloads", value: (data.totalDownloads ?? 0).toLocaleString(), color: "text-blue-500" },
+          { icon: "cloud_upload", label: "Uploads This Month", value: String(uploadsThisMonth), color: "text-purple-500" },
+          { icon: "storage", label: "Storage This Month", value: formatFileSize(storageThisMonth), color: "text-green-500" },
+        ].map((stat) => (
+          <div key={stat.label} className="bg-[#141414] border border-white/5 rounded-2xl p-8 shadow-glow-card relative overflow-hidden group hover:border-primary/30 transition-all duration-300">
+            <div className="absolute top-0 right-0 p-4 opacity-10 group-hover:opacity-20 transition-opacity">
+              <Icon name={stat.icon} className={cn("text-6xl", stat.color)} />
+            </div>
+            <div className="text-gray-400 text-sm font-medium mb-2">{stat.label}</div>
+            <div className="text-3xl font-bold text-white tracking-tight">{stat.value}</div>
+          </div>
+        ))}
+      </div>
+
+      {/* Charts row */}
+      <div className="grid grid-cols-1 xl:grid-cols-2 gap-6">
+        {/* Uploads per day area chart */}
+        <div className="bg-[#141414] border border-white/5 rounded-2xl p-8 shadow-glow-card">
+          <h3 className="text-lg font-bold text-white mb-6 flex items-center gap-2">
+            <span className="w-1 h-5 bg-primary rounded-full" /> Uploads Per Day
+          </h3>
+          <ResponsiveContainer width="100%" height={280}>
+            <AreaChart data={uploadsPerDay}>
+              <defs>
+                <linearGradient id="uploadGrad" x1="0" y1="0" x2="0" y2="1">
+                  <stop offset="5%" stopColor="#f97316" stopOpacity={0.3} />
+                  <stop offset="95%" stopColor="#f97316" stopOpacity={0} />
+                </linearGradient>
+              </defs>
+              <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.05)" />
+              <XAxis dataKey="date" tick={{ fill: "#6b7280", fontSize: 11 }} tickFormatter={(v: string) => v.slice(5)} />
+              <YAxis tick={{ fill: "#6b7280", fontSize: 11 }} allowDecimals={false} />
+              <Tooltip content={<CustomTooltip />} />
+              <Area type="monotone" dataKey="count" name="Uploads" stroke="#f97316" fill="url(#uploadGrad)" strokeWidth={2} />
+            </AreaChart>
+          </ResponsiveContainer>
+        </div>
+
+        {/* Storage growth bar chart */}
+        <div className="bg-[#141414] border border-white/5 rounded-2xl p-8 shadow-glow-card">
+          <h3 className="text-lg font-bold text-white mb-6 flex items-center gap-2">
+            <span className="w-1 h-5 bg-blue-500 rounded-full" /> Storage Growth Per Day
+          </h3>
+          <ResponsiveContainer width="100%" height={280}>
+            <BarChart data={uploadsPerDay}>
+              <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.05)" />
+              <XAxis dataKey="date" tick={{ fill: "#6b7280", fontSize: 11 }} tickFormatter={(v: string) => v.slice(5)} />
+              <YAxis tick={{ fill: "#6b7280", fontSize: 11 }} tickFormatter={(v: number) => formatFileSize(v)} />
+              <Tooltip content={<CustomTooltip />} />
+              <Bar dataKey="size" name="Storage" fill="#3b82f6" radius={[4, 4, 0, 0]} />
+            </BarChart>
+          </ResponsiveContainer>
+        </div>
+      </div>
+
+      {/* Bottom row */}
+      <div className="grid grid-cols-1 xl:grid-cols-2 gap-6">
+        {/* Top uploaders */}
+        <div className="bg-[#141414] border border-white/5 rounded-2xl p-8 shadow-glow-card">
+          <h3 className="text-lg font-bold text-white mb-6 flex items-center gap-2">
+            <span className="w-1 h-5 bg-purple-500 rounded-full" /> Top Uploaders
+          </h3>
+          {topUploaders.length === 0 ? (
+            <p className="text-gray-500 text-sm">No upload data yet.</p>
+          ) : (
+            <div className="space-y-3">
+              {topUploaders.map((u: any, i: number) => (
+                <div key={u.username} className="flex items-center justify-between py-2 border-b border-white/5 last:border-0">
+                  <div className="flex items-center gap-3">
+                    <span className="w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold" style={{ backgroundColor: COLORS[i % COLORS.length] + "20", color: COLORS[i % COLORS.length] }}>
+                      {i + 1}
+                    </span>
+                    <span className="text-white font-medium text-sm">{u.username}</span>
+                  </div>
+                  <div className="text-right">
+                    <span className="text-white text-sm font-medium">{u.count} files</span>
+                    <span className="text-gray-500 text-xs ml-2">({formatFileSize(u.size || 0)})</span>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+
+        {/* File type distribution pie chart */}
+        <div className="bg-[#141414] border border-white/5 rounded-2xl p-8 shadow-glow-card">
+          <h3 className="text-lg font-bold text-white mb-6 flex items-center gap-2">
+            <span className="w-1 h-5 bg-green-500 rounded-full" /> File Type Distribution
+          </h3>
+          {pieData.length === 0 ? (
+            <p className="text-gray-500 text-sm">No upload data yet.</p>
+          ) : (
+            <div className="flex items-center gap-6">
+              <ResponsiveContainer width="60%" height={220}>
+                <PieChart>
+                  <Pie data={pieData} cx="50%" cy="50%" innerRadius={50} outerRadius={80} paddingAngle={3} dataKey="value">
+                    {pieData.map((_: any, i: number) => (
+                      <Cell key={i} fill={COLORS[i % COLORS.length]} />
+                    ))}
+                  </Pie>
+                  <Tooltip contentStyle={{ backgroundColor: "#1a1a1a", border: "1px solid rgba(255,255,255,0.1)", borderRadius: "8px", fontSize: "12px" }} />
+                </PieChart>
+              </ResponsiveContainer>
+              <div className="space-y-2">
+                {pieData.map((entry: any, i: number) => (
+                  <div key={entry.name} className="flex items-center gap-2 text-sm">
+                    <span className="w-3 h-3 rounded-full" style={{ backgroundColor: COLORS[i % COLORS.length] }} />
+                    <span className="text-gray-400">{entry.name}</span>
+                    <span className="text-white font-medium ml-auto">{entry.value}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function FeaturesTab({ toast }: any) {
+  const [flags, setFlags] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  const loadFlags = () => {
+    fetch("/api/admin/features")
+      .then((r) => r.json())
+      .then((d) => setFlags(d.flags || []))
+      .catch(() => {})
+      .finally(() => setLoading(false));
+  };
+
+  useEffect(() => { loadFlags(); }, []);
+
+  const toggle = async (key: string, field: "enabled" | "members_enabled", current: number) => {
+    const flag = flags.find((f: any) => f.key === key);
+    if (!flag) return;
+    const body: any = { key, enabled: !!flag.enabled, members_enabled: !!flag.members_enabled };
+    body[field] = !current;
+    const csrf = getCsrfToken();
+    const res = await fetch("/api/admin/features", {
+      method: "PUT",
+      headers: { "Content-Type": "application/json", ...(csrf ? { "x-csrf-token": csrf } : {}) },
+      body: JSON.stringify(body),
+    });
+    if (res.ok) {
+      setFlags((prev) => prev.map((f) => f.key === key ? { ...f, [field]: current ? 0 : 1 } : f));
+      toast({ title: "Updated", description: `${flag.label} ${field === "enabled" ? (current ? "disabled" : "enabled") : (current ? "restricted to admin" : "enabled for members")}` });
+    }
+  };
+
+  if (loading) {
+    return (
+      <div className="mt-6 flex items-center justify-center py-20">
+        <Icon name="progress_activity" className="text-4xl text-primary animate-spin" />
+      </div>
+    );
+  }
+
+  return (
+    <div className="mt-6 space-y-4">
+      <p className="text-gray-400 text-sm mb-4">Enable or disable features globally. When a feature is enabled, you can also control whether regular members have access or only admins.</p>
+      <div className="grid gap-3">
+        {flags.map((flag: any) => (
+          <div key={flag.key} className="bg-[#141414] border border-white/5 rounded-xl p-5 flex items-center justify-between gap-4 hover:border-white/10 transition-colors">
+            <div className="flex-1 min-w-0">
+              <div className="flex items-center gap-2">
+                <span className="text-white font-medium text-sm">{flag.label}</span>
+                {!flag.enabled && <span className="text-[10px] bg-red-500/20 text-red-400 px-2 py-0.5 rounded-full font-medium">OFF</span>}
+                {flag.enabled && !flag.members_enabled && <span className="text-[10px] bg-yellow-500/20 text-yellow-400 px-2 py-0.5 rounded-full font-medium">ADMIN ONLY</span>}
+              </div>
+              <p className="text-gray-500 text-xs mt-0.5">{flag.description}</p>
+            </div>
+            <div className="flex items-center gap-6 shrink-0">
+              <div className="flex flex-col items-center gap-1">
+                <span className="text-[10px] text-gray-500 uppercase tracking-wider">Enabled</span>
+                <Switch checked={!!flag.enabled} onCheckedChange={() => toggle(flag.key, "enabled", flag.enabled)} />
+              </div>
+              <div className="flex flex-col items-center gap-1">
+                <span className="text-[10px] text-gray-500 uppercase tracking-wider">Members</span>
+                <Switch checked={!!flag.members_enabled} disabled={!flag.enabled} onCheckedChange={() => toggle(flag.key, "members_enabled", flag.members_enabled)} />
+              </div>
+            </div>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+

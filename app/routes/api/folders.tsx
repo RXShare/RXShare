@@ -4,10 +4,13 @@ import { query, execute } from "~/.server/db";
 import { rateLimit } from "~/.server/rate-limit";
 import { validateCsrf } from "~/.server/csrf";
 import { logAudit, getClientIp } from "~/.server/audit";
+import { isFeatureEnabled } from "~/.server/features";
+import { isAdmin } from "~/.server/auth";
 
 export async function loader({ request }: { request: Request }) {
   const session = await getSession(request);
   if (!session) return Response.json({ error: "Unauthorized" }, { status: 401 });
+  if (!isFeatureEnabled("folders", isAdmin(session.user.id))) return Response.json({ error: "Feature disabled", folders: [] }, { status: 200 });
   const folders = query<any>("SELECT * FROM folders WHERE user_id = ? ORDER BY created_at DESC", [session.user.id]);
   return Response.json({ folders });
 }
@@ -18,6 +21,7 @@ export async function action({ request }: { request: Request }) {
 
   const session = await getSession(request);
   if (!session) return Response.json({ error: "Unauthorized" }, { status: 401 });
+  if (!isFeatureEnabled("folders", isAdmin(session.user.id))) return Response.json({ error: "Feature disabled" }, { status: 403 });
 
   if (request.method === "POST") {
     const limited = rateLimit("folder-create", request, 30, 10 * 60 * 1000);

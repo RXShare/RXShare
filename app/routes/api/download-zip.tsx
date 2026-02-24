@@ -5,6 +5,8 @@ import { query } from "~/.server/db";
 import { getStorage } from "~/.server/storage";
 import { rateLimit } from "~/.server/rate-limit";
 import { validateCsrf } from "~/.server/csrf";
+import { isFeatureEnabled } from "~/.server/features";
+import { isAdmin } from "~/.server/auth";
 
 export async function action({ request }: { request: Request }) {
   if (request.method !== "POST") return new Response("Method not allowed", { status: 405 });
@@ -17,6 +19,7 @@ export async function action({ request }: { request: Request }) {
 
   const session = await getSession(request);
   if (!session) return Response.json({ error: "Unauthorized" }, { status: 401 });
+  if (!isFeatureEnabled("zip_download", isAdmin(session.user.id))) return Response.json({ error: "Feature disabled" }, { status: 403 });
 
   const { ids } = await request.json();
   if (!Array.isArray(ids) || ids.length === 0) return Response.json({ error: "No files selected" }, { status: 400 });
