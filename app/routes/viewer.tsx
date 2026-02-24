@@ -9,7 +9,7 @@ import { codeToHtml } from "shiki";
 import QRCode from "qrcode";
 
 export async function loader({ params, request }: { params: { fileName: string }; request: Request }) {
-  const upload = queryOne<any>("SELECT u.*, us.embed_title, us.embed_description, us.embed_color, us.custom_path, usr.username FROM uploads u LEFT JOIN user_settings us ON u.user_id = us.user_id LEFT JOIN users usr ON u.user_id = usr.id WHERE u.file_name = ?", [params.fileName]);
+  const upload = queryOne<any>("SELECT u.*, us.embed_title, us.embed_description, us.embed_color, us.embed_author, us.embed_site_name, us.embed_logo_url, us.custom_path, usr.username FROM uploads u LEFT JOIN user_settings us ON u.user_id = us.user_id LEFT JOIN users usr ON u.user_id = usr.id WHERE u.file_name = ?", [params.fileName]);
   if (!upload) throw new Response("Not Found", { status: 404 });
 
   const session = await getSession(request);
@@ -75,23 +75,28 @@ export function meta({ data }: { data: any }) {
   const { upload, baseUrl, primaryColor } = data;
   const isImage = upload.mime_type?.startsWith("image/");
   const isVideo = upload.mime_type?.startsWith("video/");
+  const isGif = upload.mime_type === "image/gif";
   const fileUrl = `${baseUrl}/api/files/${upload.file_path}`;
-  // For images/videos: use full file as og:image so Discord embeds show it large
-  // For other files: use preview if available
   const ogImage = isImage ? fileUrl : upload.preview_path ? `${baseUrl}/api/files/${upload.preview_path}` : null;
   const safeColor = (c: string) => /^#[0-9a-fA-F]{3,8}$/.test(c) ? c : "#f97316";
+  const siteName = upload.embed_site_name || "RXShare";
+  const author = upload.embed_author || upload.username || null;
   return [
     { title: upload.embed_title || upload.original_name },
     { name: "description", content: upload.embed_description || `${upload.original_name} - ${formatFileSize(upload.file_size)}` },
     { property: "og:title", content: upload.embed_title || upload.original_name },
     { property: "og:description", content: upload.embed_description || formatFileSize(upload.file_size) },
+    { property: "og:site_name", content: siteName },
+    ...(author ? [{ property: "article:author", content: author }] : []),
     ...(ogImage ? [
       { property: "og:image", content: ogImage },
       { property: "og:image:width", content: "1200" },
       { property: "og:image:height", content: "630" },
     ] : []),
+    ...(upload.embed_logo_url ? [{ property: "og:image:alt", content: siteName }] : []),
     { property: "og:type", content: isImage ? "image" : "website" },
     { name: "twitter:card", content: isImage || isVideo ? "summary_large_image" : "summary" },
+    ...(ogImage ? [{ name: "twitter:image", content: ogImage }] : []),
     { name: "theme-color", content: safeColor(upload.embed_color || primaryColor || "#f97316") },
     ...(isVideo ? [
       { property: "og:video", content: fileUrl },

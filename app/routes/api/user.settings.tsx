@@ -25,7 +25,7 @@ export async function action({ request }: { request: Request }) {
   if (!session) return Response.json({ error: "Unauthorized" }, { status: 401 });
 
   const body = await request.json();
-  const allowed = ["embed_title", "embed_description", "embed_color", "default_public", "custom_path", "sharex_folder_name"];
+  const allowed = ["embed_title", "embed_description", "embed_color", "embed_author", "embed_site_name", "embed_logo_url", "default_public", "custom_path", "sharex_folder_name"];
   const sets: string[] = [];
   const vals: any[] = [];
 

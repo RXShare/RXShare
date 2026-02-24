@@ -25,6 +25,9 @@ export default function SettingsPage() {
   const [embedTitle, setEmbedTitle] = useState(settings?.embed_title || "File Upload");
   const [embedDescription, setEmbedDescription] = useState(settings?.embed_description || "");
   const [embedColor, setEmbedColor] = useState(settings?.embed_color || "#f97316");
+  const [embedAuthor, setEmbedAuthor] = useState(settings?.embed_author || "");
+  const [embedSiteName, setEmbedSiteName] = useState(settings?.embed_site_name || "");
+  const [embedLogoUrl, setEmbedLogoUrl] = useState(settings?.embed_logo_url || "");
   const [defaultPublic, setDefaultPublic] = useState(settings?.default_public !== 0);
   const [customPath, setCustomPath] = useState(settings?.custom_path || "");
   const [sharexFolderName, setSharexFolderName] = useState(settings?.sharex_folder_name ?? "ShareX");
@@ -34,7 +37,7 @@ export default function SettingsPage() {
   const saveSettings = async () => {
     const res = await fetch("/api/user/settings", {
       method: "PUT", headers: { "Content-Type": "application/json", ...(getCsrfToken() ? { "X-CSRF-Token": getCsrfToken()! } : {}) },
-      body: JSON.stringify({ embed_title: embedTitle, embed_description: embedDescription || null, embed_color: embedColor, default_public: defaultPublic, custom_path: customPath || null, sharex_folder_name: sharexFolderName || "ShareX" }),
+      body: JSON.stringify({ embed_title: embedTitle, embed_description: embedDescription || null, embed_color: embedColor, embed_author: embedAuthor || null, embed_site_name: embedSiteName || null, embed_logo_url: embedLogoUrl || null, default_public: defaultPublic, custom_path: customPath || null, sharex_folder_name: sharexFolderName || "ShareX" }),
     });
     if (res.ok) { revalidator.revalidate(); toast({ title: "Settings saved!" }); }
     else { const d = await res.json(); toast({ title: "Error", description: d.error, variant: "destructive" }); }
@@ -81,8 +84,11 @@ export default function SettingsPage() {
       <section className="bg-[#141414] border border-white/5 rounded-2xl p-8 shadow-glow-card space-y-6">
         <h3 className="text-xl font-bold text-white flex items-center gap-2"><span className="w-1 h-6 bg-primary rounded-full" /> Embed Settings</h3>
         <p className="text-sm text-gray-500 -mt-4">Customize how your shared links appear on Discord, Telegram, etc.</p>
-        <div className="space-y-2"><label className="text-sm font-medium text-gray-400">Embed Title</label><input value={embedTitle} onChange={(e) => setEmbedTitle(e.target.value)} className={inputCls} /></div>
-        <div className="space-y-2"><label className="text-sm font-medium text-gray-400">Embed Description (optional)</label><input value={embedDescription} onChange={(e) => setEmbedDescription(e.target.value)} className={inputCls} /></div>
+        <div className="space-y-2"><label className="text-sm font-medium text-gray-400">Embed Title</label><input value={embedTitle} onChange={(e) => setEmbedTitle(e.target.value)} className={inputCls} placeholder="File Upload" /></div>
+        <div className="space-y-2"><label className="text-sm font-medium text-gray-400">Embed Description (optional)</label><input value={embedDescription} onChange={(e) => setEmbedDescription(e.target.value)} className={inputCls} placeholder="Shown below the title in embeds" /></div>
+        <div className="space-y-2"><label className="text-sm font-medium text-gray-400">Embed Author (optional)</label><input value={embedAuthor} onChange={(e) => setEmbedAuthor(e.target.value)} className={inputCls} placeholder="Your name or brand" /></div>
+        <div className="space-y-2"><label className="text-sm font-medium text-gray-400">Embed Site Name (optional)</label><input value={embedSiteName} onChange={(e) => setEmbedSiteName(e.target.value)} className={inputCls} placeholder="RXShare" /><p className="text-xs text-gray-600">Shown as the provider name above the title in Discord</p></div>
+        <div className="space-y-2"><label className="text-sm font-medium text-gray-400">Embed Logo URL (optional)</label><input value={embedLogoUrl} onChange={(e) => setEmbedLogoUrl(e.target.value)} className={inputCls} placeholder="https://example.com/logo.png" /><p className="text-xs text-gray-600">Small icon shown next to the site name</p></div>
         <div className="space-y-2">
           <label className="text-sm font-medium text-gray-400">Theme Color</label>
           <div className="flex items-center gap-3">

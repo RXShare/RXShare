@@ -1,29 +1,73 @@
 import { query, queryOne } from "~/.server/db";
 import { useLoaderData } from "react-router";
 import { formatFileSize, getMimeCategory } from "~/lib/utils-format";
+import { getBaseUrl } from "~/.server/base-url";
 import { Icon } from "~/components/Icon";
 import { cn } from "~/lib/utils";
 
-export async function loader({ params }: { params: { customPath: string; fileName?: string } }) {
+export async function loader({ params, request }: { params: { customPath: string; fileName?: string }; request: Request }) {
   const { customPath, fileName } = params;
 
   // Look up user by custom_path
   const row = queryOne<any>(
-    "SELECT u.id, u.username FROM users u JOIN user_settings us ON u.id = us.user_id WHERE us.custom_path = ?",
+    "SELECT u.id, u.username, us.embed_title, us.embed_description, us.embed_color, us.embed_author, us.embed_site_name, us.embed_logo_url FROM users u JOIN user_settings us ON u.id = us.user_id WHERE us.custom_path = ?",
     [customPath]
   );
   if (!row) throw new Response("Not Found", { status: 404 });
 
   const sys = queryOne<any>("SELECT primary_color, background_pattern FROM system_settings LIMIT 1");
+  const baseUrl = getBaseUrl(request);
 
   if (fileName) {
     const upload = queryOne<any>("SELECT * FROM uploads WHERE user_id = ? AND file_name = ? AND is_public = 1", [row.id, fileName]);
     if (!upload) throw new Response("Not Found", { status: 404 });
-    return { type: "file" as const, upload, user: row, backgroundPattern: sys?.background_pattern || "grid" };
+    return { type: "file" as const, upload, user: row, baseUrl, primaryColor: sys?.primary_color || null, backgroundPattern: sys?.background_pattern || "grid" };
   }
 
   const uploads = query<any>("SELECT * FROM uploads WHERE user_id = ? AND is_public = 1 ORDER BY created_at DESC", [row.id]);
-  return { type: "list" as const, uploads, user: row, backgroundPattern: sys?.background_pattern || "grid" };
+  return { type: "list" as const, uploads, user: row, baseUrl, primaryColor: sys?.primary_color || null, backgroundPattern: sys?.background_pattern || "grid" };
+}
+
+export function meta({ data }: { data: any }) {
+  if (!data) return [{ title: "Not Found" }];
+  if (data.type === "file" && data.upload) {
+    const { upload, user, baseUrl, primaryColor } = data;
+    const isImage = upload.mime_type?.startsWith("image/");
+    const isVideo = upload.mime_type?.startsWith("video/");
+    const fileUrl = `${baseUrl}/api/files/${upload.file_path}`;
+    const ogImage = isImage ? fileUrl : upload.preview_path ? `${baseUrl}/api/files/${upload.preview_path}` : null;
+    const safeColor = (c: string) => /^#[0-9a-fA-F]{3,8}$/.test(c) ? c : "#f97316";
+    const siteName = user.embed_site_name || "RXShare";
+    const author = user.embed_author || user.username || null;
+    return [
+      { title: user.embed_title || upload.original_name },
+      { name: "description", content: user.embed_description || `${upload.original_name} - ${formatFileSize(upload.file_size)}` },
+      { property: "og:title", content: user.embed_title || upload.original_name },
+      { property: "og:description", content: user.embed_description || formatFileSize(upload.file_size) },
+      { property: "og:site_name", content: siteName },
+      ...(author ? [{ property: "article:author", content: author }] : []),
+      ...(ogImage ? [
+        { property: "og:image", content: ogImage },
+        { property: "og:image:width", content: "1200" },
+        { property: "og:image:height", content: "630" },
+      ] : []),
+      { property: "og:type", content: isImage ? "image" : "website" },
+      { name: "twitter:card", content: isImage || isVideo ? "summary_large_image" : "summary" },
+      ...(ogImage ? [{ name: "twitter:image", content: ogImage }] : []),
+      { name: "theme-color", content: safeColor(user.embed_color || primaryColor || "#f97316") },
+      ...(isVideo ? [
+        { property: "og:video", content: fileUrl },
+        { property: "og:video:type", content: upload.mime_type },
+      ] : []),
+    ];
+  }
+  if (data.type === "list" && data.user) {
+    return [
+      { title: `${data.user.username}'s files` },
+      { name: "description", content: `${data.uploads?.length || 0} public files` },
+    ];
+  }
+  return [{ title: "Not Found" }];
 }
 
 export default function CustomPathViewer() {

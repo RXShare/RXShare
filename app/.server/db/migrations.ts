@@ -133,6 +133,10 @@ export function getMigrationUpdates(): string[] {
     "ALTER TABLE user_settings ADD COLUMN sharex_folder_name TEXT DEFAULT 'ShareX'",
     // External URL support for short links
     "ALTER TABLE short_links ADD COLUMN external_url TEXT",
+    // Extended embed customization
+    "ALTER TABLE user_settings ADD COLUMN embed_author TEXT",
+    "ALTER TABLE user_settings ADD COLUMN embed_site_name TEXT",
+    "ALTER TABLE user_settings ADD COLUMN embed_logo_url TEXT",
   ];
 }
 
