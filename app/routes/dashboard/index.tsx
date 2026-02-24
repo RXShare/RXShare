@@ -55,6 +55,9 @@ export default function UploadsPage() {
   const [folders, setFolders] = useState<any[]>([]);
   const [newFolderName, setNewFolderName] = useState("");
   const [activeFolder, setActiveFolder] = useState<string | null>(null);
+  const [moveToFolderFile, setMoveToFolderFile] = useState<any>(null);
+  const [showNewFolderDialog, setShowNewFolderDialog] = useState(false);
+  const [newFolderDialogName, setNewFolderDialogName] = useState("");
   const [focusIndex, setFocusIndex] = useState(-1);
   const [filterType, setFilterType] = useState<string>("");
   const [filterStatus, setFilterStatus] = useState<string>("");
@@ -206,16 +209,18 @@ export default function UploadsPage() {
   };
 
   const createFolder = async () => {
-    if (!newFolderName.trim()) return;
+    const name = newFolderDialogName.trim() || newFolderName.trim();
+    if (!name) return;
     const res = await fetch("/api/folders", {
       method: "POST",
       headers: { "Content-Type": "application/json", ...(getCsrfToken() ? { "X-CSRF-Token": getCsrfToken()! } : {}) },
-      body: JSON.stringify({ name: newFolderName.trim() }),
+      body: JSON.stringify({ name }),
     });
     if (res.ok) {
       const d = await res.json();
       setFolders(prev => [d, ...prev]);
       setNewFolderName("");
+      setNewFolderDialogName("");
       toast({ title: "Folder created" });
     }
   };
@@ -422,7 +427,7 @@ export default function UploadsPage() {
       </div>
 
       {/* Folders */}
-      {featureFlags.folders && folders.length > 0 && (
+      {featureFlags.folders && (
         <div className="flex items-center gap-3 overflow-x-auto pb-1">
           <button onClick={() => setActiveFolder(null)}
             className={cn("flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-medium transition-all shrink-0",
@@ -442,23 +447,9 @@ export default function UploadsPage() {
               </button>
             </div>
           ))}
-          <div className="flex items-center gap-1 shrink-0">
-            <input value={newFolderName} onChange={(e) => setNewFolderName(e.target.value)} placeholder="New folder"
-              onKeyDown={(e) => e.key === "Enter" && createFolder()}
-              className="px-3 py-2 border border-white/10 rounded-lg bg-[#0a0a0a] text-gray-300 placeholder-gray-600 focus:outline-none focus:ring-1 focus:ring-primary text-sm w-32" />
-            <button onClick={createFolder} className="p-2 text-gray-400 hover:text-primary hover:bg-white/5 rounded-lg transition-colors">
-              <Icon name="create_new_folder" className="text-lg" />
-            </button>
-          </div>
-        </div>
-      )}
-      {featureFlags.folders && folders.length === 0 && (
-        <div className="flex items-center gap-2">
-          <input value={newFolderName} onChange={(e) => setNewFolderName(e.target.value)} placeholder="Create a folder..."
-            onKeyDown={(e) => e.key === "Enter" && createFolder()}
-            className="px-3 py-2 border border-white/10 rounded-lg bg-[#0a0a0a] text-gray-300 placeholder-gray-600 focus:outline-none focus:ring-1 focus:ring-primary text-sm w-48" />
-          <button onClick={createFolder} className="p-2 text-gray-400 hover:text-primary hover:bg-white/5 rounded-lg transition-colors">
-            <Icon name="create_new_folder" className="text-lg" />
+          <button onClick={() => { setNewFolderDialogName(""); setShowNewFolderDialog(true); }}
+            className="flex items-center gap-1.5 px-3 py-2 rounded-xl text-sm font-medium bg-white/5 text-gray-400 border border-dashed border-white/10 hover:bg-white/10 hover:text-white transition-all shrink-0">
+            <Icon name="create_new_folder" className="text-lg" /> New Folder
           </button>
         </div>
       )}
@@ -543,9 +534,9 @@ export default function UploadsPage() {
                       <DropdownMenuItem onClick={() => { setSettingsFile(upload); setFilePassword(""); setFileExpiry(""); setFileDescription(upload.description || ""); }} className="flex items-center gap-3 px-3 py-2 text-sm text-gray-300 hover:text-white hover:bg-white/5 rounded-lg">
                         <Icon name="settings" className="text-lg" /> Settings
                       </DropdownMenuItem>
-                      {featureFlags.folders && folders.length > 0 && (
-                        <DropdownMenuItem onClick={() => moveToFolder(upload.id, upload.folder_id ? null : folders[0].id)} className="flex items-center gap-3 px-3 py-2 text-sm text-gray-300 hover:text-white hover:bg-white/5 rounded-lg">
-                          <Icon name="folder" className="text-lg" /> {upload.folder_id ? "Remove from folder" : "Move to folder"}
+                      {featureFlags.folders && (
+                        <DropdownMenuItem onClick={() => setMoveToFolderFile(upload)} className="flex items-center gap-3 px-3 py-2 text-sm text-gray-300 hover:text-white hover:bg-white/5 rounded-lg">
+                          <Icon name="folder" className="text-lg" /> {upload.folder_id ? "Change folder" : "Move to folder"}
                         </DropdownMenuItem>
                       )}
                       <div className="h-px bg-white/5 my-1" />
@@ -757,6 +748,49 @@ export default function UploadsPage() {
             <button onClick={() => setSettingsFile(null)} className="px-4 py-2 text-sm text-gray-400 border border-white/10 rounded-lg hover:bg-white/5 transition-colors">Cancel</button>
             <button onClick={saveFileSettings} className="px-4 py-2 text-sm text-white bg-primary hover:bg-[var(--primary-hover)] rounded-lg shadow-glow-primary transition-all">Save</button>
           </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* New Folder dialog */}
+      <Dialog open={showNewFolderDialog} onOpenChange={setShowNewFolderDialog}>
+        <DialogContent className="bg-[#141414] border-white/10 max-w-sm">
+          <DialogHeader><DialogTitle className="text-white">Create New Folder</DialogTitle></DialogHeader>
+          <div className="space-y-4">
+            <div className="space-y-2">
+              <label className="text-sm font-medium text-gray-400">Folder Name</label>
+              <input value={newFolderDialogName} onChange={(e) => setNewFolderDialogName(e.target.value)}
+                placeholder="My folder" autoFocus
+                onKeyDown={(e) => { if (e.key === "Enter" && newFolderDialogName.trim()) { createFolder(); setShowNewFolderDialog(false); } }}
+                className="block w-full px-4 py-2.5 border border-white/10 rounded-lg bg-[#0a0a0a] text-gray-300 placeholder-gray-600 focus:outline-none focus:ring-1 focus:ring-primary text-sm" />
+            </div>
+          </div>
+          <div className="flex justify-end gap-2 mt-2">
+            <button onClick={() => setShowNewFolderDialog(false)} className="px-4 py-2 text-sm text-gray-400 border border-white/10 rounded-lg hover:bg-white/5 transition-colors">Cancel</button>
+            <button onClick={() => { createFolder(); setShowNewFolderDialog(false); }} disabled={!newFolderDialogName.trim()}
+              className="px-4 py-2 text-sm text-white bg-primary hover:bg-[var(--primary-hover)] rounded-lg shadow-glow-primary transition-all disabled:opacity-50">Create</button>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Move to Folder dialog */}
+      <Dialog open={!!moveToFolderFile} onOpenChange={() => setMoveToFolderFile(null)}>
+        <DialogContent className="bg-[#141414] border-white/10 max-w-sm">
+          <DialogHeader><DialogTitle className="text-white truncate">Move "{moveToFolderFile?.original_name}"</DialogTitle></DialogHeader>
+          <div className="space-y-2 max-h-64 overflow-y-auto">
+            <button onClick={() => { moveToFolder(moveToFolderFile.id, null); setMoveToFolderFile(null); }}
+              className={cn("w-full flex items-center gap-3 px-4 py-3 rounded-xl text-sm transition-all",
+                !moveToFolderFile?.folder_id ? "bg-primary/20 text-primary border border-primary/30" : "bg-white/5 text-gray-300 border border-white/5 hover:bg-white/10")}>
+              <Icon name="folder_off" className="text-lg" /> No folder
+            </button>
+            {folders.map((f: any) => (
+              <button key={f.id} onClick={() => { moveToFolder(moveToFolderFile.id, f.id); setMoveToFolderFile(null); }}
+                className={cn("w-full flex items-center gap-3 px-4 py-3 rounded-xl text-sm transition-all",
+                  moveToFolderFile?.folder_id === f.id ? "bg-primary/20 text-primary border border-primary/30" : "bg-white/5 text-gray-300 border border-white/5 hover:bg-white/10")}>
+                <Icon name="folder" className="text-lg" /> {f.name}
+              </button>
+            ))}
+          </div>
+          {folders.length === 0 && <p className="text-gray-500 text-sm text-center py-2">No folders yet. Create one first.</p>}
         </DialogContent>
       </Dialog>
     </div>

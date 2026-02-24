@@ -746,6 +746,7 @@ function InvitesTab({ toast, systemSettings }: any) {
 function AnalyticsTab() {
   const [data, setData] = useState<any>(null);
   const [loading, setLoading] = useState(true);
+  const [rc, setRc] = useState<any>(null);
 
   useEffect(() => {
     fetch("/api/admin/analytics")
@@ -753,9 +754,10 @@ function AnalyticsTab() {
       .then((d) => setData(d))
       .catch(() => {})
       .finally(() => setLoading(false));
+    import("recharts").then(setRc);
   }, []);
 
-  if (loading) {
+  if (loading || !rc) {
     return (
       <div className="mt-6 flex items-center justify-center py-20">
         <Icon name="progress_activity" className="text-4xl text-primary animate-spin" />
@@ -774,7 +776,7 @@ function AnalyticsTab() {
   const {
     AreaChart, Area, BarChart, Bar, PieChart, Pie, Cell,
     XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
-  } = require("recharts");
+  } = rc;
 
   const COLORS = ["#f97316", "#3b82f6", "#8b5cf6", "#22c55e", "#ec4899"];
 
