@@ -1,5 +1,6 @@
 import { getStorage } from "~/.server/storage";
 import { queryOne } from "~/.server/db";
+import { getSession } from "~/.server/session";
 import crypto from "crypto";
 
 const mimeMap: Record<string, string> = {
@@ -47,6 +48,15 @@ export async function loader({ request }: { request: Request }) {
   try {
     const exists = await storage.exists(filePath);
     if (!exists) return new Response("Not Found", { status: 404 });
+
+    // Check private file access control
+    const accessCheck = queryOne<any>("SELECT user_id, is_public FROM uploads WHERE file_path = ? OR thumbnail_path = ?", [filePath, filePath]);
+    if (accessCheck && !accessCheck.is_public) {
+      const session = await getSession(request);
+      if (!session || session.user.id !== accessCheck.user_id) {
+        return new Response("Not Found", { status: 404 });
+      }
+    }
 
     const contentType = getContentType(filePath);
     const rangeHeader = request.headers.get("Range");

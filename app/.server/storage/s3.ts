@@ -1,5 +1,6 @@
 import { S3Client, PutObjectCommand, GetObjectCommand, DeleteObjectCommand, HeadObjectCommand } from "@aws-sdk/client-s3";
 import type { StorageAdapter } from "./adapter";
+import { encryptBuffer, decryptBuffer, getDecryptedSize, isEncryptionEnabled, ENCRYPTION_HEADER_LENGTH } from "../encryption";
 
 function getClient() {
   return new S3Client({
@@ -19,23 +20,57 @@ export function createS3Storage(): StorageAdapter {
   const client = getClient();
   return {
     async save(filePath: string, data: Buffer) {
-      await client.send(new PutObjectCommand({ Bucket: bucket(), Key: filePath, Body: data }));
+      const toUpload = encryptBuffer(data);
+      await client.send(new PutObjectCommand({ Bucket: bucket(), Key: filePath, Body: toUpload }));
     },
     async saveStream(filePath: string, stream: ReadableStream<Uint8Array>) {
-      // S3 PutObject accepts a web ReadableStream
-      await client.send(new PutObjectCommand({ Bucket: bucket(), Key: filePath, Body: stream as any }));
+      // Collect the stream into a buffer so we can encrypt it
+      const chunks: Uint8Array[] = [];
+      const reader = stream.getReader();
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        if (value) chunks.push(value);
+      }
+      const data = Buffer.concat(chunks);
+      const toUpload = encryptBuffer(data);
+      await client.send(new PutObjectCommand({ Bucket: bucket(), Key: filePath, Body: toUpload }));
     },
     async read(filePath: string) {
       const res = await client.send(new GetObjectCommand({ Bucket: bucket(), Key: filePath }));
-      return Buffer.from(await res.Body!.transformToByteArray());
+      const raw = Buffer.from(await res.Body!.transformToByteArray());
+      return decryptBuffer(raw);
     },
     async readStream(filePath: string) {
       const res = await client.send(new GetObjectCommand({ Bucket: bucket(), Key: filePath }));
-      const size = res.ContentLength ?? 0;
-      const stream = res.Body!.transformToWebStream() as ReadableStream<Uint8Array>;
-      return { stream, size };
+      const raw = Buffer.from(await res.Body!.transformToByteArray());
+      const decrypted = decryptBuffer(raw);
+      const stream = new ReadableStream<Uint8Array>({
+        start(controller) {
+          controller.enqueue(decrypted);
+          controller.close();
+        },
+      });
+      return { stream, size: decrypted.length };
     },
     async readRangeStream(filePath: string, start: number, end: number) {
+      if (isEncryptionEnabled()) {
+        // Encrypted file: must download and decrypt fully, then slice
+        const res = await client.send(new GetObjectCommand({ Bucket: bucket(), Key: filePath }));
+        const raw = Buffer.from(await res.Body!.transformToByteArray());
+        const decrypted = decryptBuffer(raw);
+        const totalSize = decrypted.length;
+        const slice = decrypted.subarray(start, end + 1);
+        const stream = new ReadableStream<Uint8Array>({
+          start(controller) {
+            controller.enqueue(slice);
+            controller.close();
+          },
+        });
+        return { stream, size: slice.length, totalSize };
+      }
+
+      // Unencrypted: use S3 range request directly
       const res = await client.send(new GetObjectCommand({ Bucket: bucket(), Key: filePath, Range: `bytes=${start}-${end}` }));
       const totalSize = res.ContentLength ?? (end - start + 1);
       // Parse total size from Content-Range header if available
@@ -50,7 +85,8 @@ export function createS3Storage(): StorageAdapter {
     },
     async getSize(filePath: string) {
       const res = await client.send(new HeadObjectCommand({ Bucket: bucket(), Key: filePath }));
-      return res.ContentLength ?? 0;
+      const onDiskSize = res.ContentLength ?? 0;
+      return getDecryptedSize(onDiskSize);
     },
     async delete(filePath: string) {
       try { await client.send(new DeleteObjectCommand({ Bucket: bucket(), Key: filePath })); } catch {}

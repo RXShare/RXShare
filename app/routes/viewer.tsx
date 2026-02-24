@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
 import { useLoaderData } from "react-router";
 import { queryOne, execute } from "~/.server/db";
+import { getSession } from "~/.server/session";
 import { getBaseUrl } from "~/.server/base-url";
 import { getMimeCategory, formatFileSize } from "~/lib/utils-format";
 import { Icon } from "~/components/Icon";
@@ -8,7 +9,12 @@ import { Icon } from "~/components/Icon";
 export async function loader({ params, request }: { params: { fileName: string }; request: Request }) {
   const upload = queryOne<any>("SELECT u.*, us.embed_title, us.embed_description, us.embed_color, us.custom_path, usr.username FROM uploads u LEFT JOIN user_settings us ON u.user_id = us.user_id LEFT JOIN users usr ON u.user_id = usr.id WHERE u.file_name = ?", [params.fileName]);
   if (!upload) throw new Response("Not Found", { status: 404 });
-  if (!upload.is_public) throw new Response("Not Found", { status: 404 });
+  if (!upload.is_public) {
+    const session = await getSession(request);
+    if (!session || session.user.id !== upload.user_id) {
+      throw new Response("Not Found", { status: 404 });
+    }
+  }
 
   // Deduplicate view counts: only increment once per upload per visitor per hour
   const cookieHeader = request.headers.get("Cookie") || "";

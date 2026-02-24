@@ -1,8 +1,9 @@
 import { join, dirname, resolve, relative } from "path";
-import { readFile, writeFile, unlink, mkdir, access, stat, open } from "fs/promises";
+import { readFile, writeFile, unlink, mkdir, access, stat } from "fs/promises";
 import { createReadStream, createWriteStream } from "fs";
-import { Readable, Writable } from "stream";
+import { Readable } from "stream";
 import type { StorageAdapter } from "./adapter";
+import { encryptBuffer, decryptBuffer, getDecryptedSize, isEncryptionEnabled, ENCRYPTION_HEADER_LENGTH } from "../encryption";
 
 const uploadsDir = process.env.UPLOADS_DIR || join(process.cwd(), "data", "uploads");
 
@@ -21,33 +22,61 @@ export function createLocalStorage(): StorageAdapter {
     async save(filePath: string, data: Buffer) {
       const full = safePath(filePath);
       await mkdir(dirname(full), { recursive: true });
-      await writeFile(full, data);
+      const toWrite = encryptBuffer(data);
+      await writeFile(full, toWrite);
     },
     async saveStream(filePath: string, stream: ReadableStream<Uint8Array>) {
       const full = safePath(filePath);
       await mkdir(dirname(full), { recursive: true });
-      const nodeWritable = createWriteStream(full);
-      const nodeReadable = Readable.fromWeb(stream as any);
-      await new Promise<void>((resolve, reject) => {
-        nodeReadable.pipe(nodeWritable);
-        nodeWritable.on("finish", resolve);
-        nodeWritable.on("error", reject);
-        nodeReadable.on("error", reject);
-      });
+
+      // Collect the stream into a buffer so we can encrypt it
+      const chunks: Uint8Array[] = [];
+      const reader = stream.getReader();
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        if (value) chunks.push(value);
+      }
+      const data = Buffer.concat(chunks);
+      const toWrite = encryptBuffer(data);
+      await writeFile(full, toWrite);
     },
     async read(filePath: string) {
-      return readFile(safePath(filePath));
+      const raw = await readFile(safePath(filePath));
+      return decryptBuffer(raw);
     },
     async readStream(filePath: string) {
       const full = safePath(filePath);
-      const info = await stat(full);
-      const nodeStream = createReadStream(full);
-      const stream = Readable.toWeb(nodeStream) as ReadableStream<Uint8Array>;
-      return { stream, size: info.size };
+      const raw = await readFile(full);
+      const decrypted = decryptBuffer(raw);
+      const stream = new ReadableStream<Uint8Array>({
+        start(controller) {
+          controller.enqueue(decrypted);
+          controller.close();
+        },
+      });
+      return { stream, size: decrypted.length };
     },
     async readRangeStream(filePath: string, start: number, end: number) {
       const full = safePath(filePath);
       const info = await stat(full);
+
+      if (isEncryptionEnabled() && info.size >= ENCRYPTION_HEADER_LENGTH) {
+        // Encrypted file: must decrypt fully, then slice the range
+        const raw = await readFile(full);
+        const decrypted = decryptBuffer(raw);
+        const totalSize = decrypted.length;
+        const slice = decrypted.subarray(start, end + 1);
+        const stream = new ReadableStream<Uint8Array>({
+          start(controller) {
+            controller.enqueue(slice);
+            controller.close();
+          },
+        });
+        return { stream, size: slice.length, totalSize };
+      }
+
+      // Unencrypted file (encryption disabled or legacy): stream range directly
       const nodeStream = createReadStream(full, { start, end });
       const stream = Readable.toWeb(nodeStream) as ReadableStream<Uint8Array>;
       return { stream, size: end - start + 1, totalSize: info.size };
@@ -55,7 +84,7 @@ export function createLocalStorage(): StorageAdapter {
     async getSize(filePath: string) {
       const full = safePath(filePath);
       const info = await stat(full);
-      return info.size;
+      return getDecryptedSize(info.size);
     },
     async delete(filePath: string) {
       try { await unlink(safePath(filePath)); } catch {}

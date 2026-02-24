@@ -1,4 +1,5 @@
 import { queryOne, execute } from "~/.server/db";
+import { getSession } from "~/.server/session";
 import { getStorage } from "~/.server/storage";
 
 const dangerousTypes = ["text/html", "image/svg+xml", "text/javascript", "application/javascript"];
@@ -19,7 +20,13 @@ function parseRange(rangeHeader: string, totalSize: number): { start: number; en
 
 export async function loader({ params, request }: { params: { fileName: string }; request: Request }) {
   const upload = queryOne<any>("SELECT * FROM uploads WHERE file_name = ?", [params.fileName]);
-  if (!upload || !upload.is_public) throw new Response("Not Found", { status: 404 });
+  if (!upload) throw new Response("Not Found", { status: 404 });
+  if (!upload.is_public) {
+    const session = await getSession(request);
+    if (!session || session.user.id !== upload.user_id) {
+      throw new Response("Not Found", { status: 404 });
+    }
+  }
 
   const storage = await getStorage();
   const safeName = upload.original_name.replace(/["\r\n]/g, "_");
