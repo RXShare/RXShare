@@ -20,7 +20,6 @@ export default [
   route("api/auth/signup", "routes/api/auth.signup.tsx"),
   route("api/auth/logout", "routes/api/auth.logout.tsx"),
   route("api/upload", "routes/api/upload.tsx"),
-  route("api/uploads", "routes/api/upload.dashboard.tsx"),
   route("api/uploads/:id", "routes/api/uploads.$id.tsx"),
   route("api/delete/:id", "routes/api/delete.$id.tsx"),
   route("api/tokens", "routes/api/tokens.tsx"),

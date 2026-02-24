@@ -9,7 +9,20 @@ const sessionCookie: Cookie = createCookie("rxshare_session", {
   path: "/",
 });
 
+// Cache parsed sessions per request to avoid redundant cookie parsing + DB lookups.
+// Uses a WeakMap keyed by the Request object so entries are GC'd automatically.
+const sessionCache = new WeakMap<Request, Promise<{ user: User } | null>>();
+
 export async function getSession(request: Request): Promise<{ user: User } | null> {
+  const cached = sessionCache.get(request);
+  if (cached !== undefined) return cached;
+
+  const promise = parseSession(request);
+  sessionCache.set(request, promise);
+  return promise;
+}
+
+async function parseSession(request: Request): Promise<{ user: User } | null> {
   const cookieHeader = request.headers.get("Cookie");
   const token = await sessionCookie.parse(cookieHeader);
   if (!token || typeof token !== "string") return null;

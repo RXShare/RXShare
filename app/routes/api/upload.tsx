@@ -54,10 +54,12 @@ export async function action({ request }: { request: Request }) {
   const ext = (file.name.split(".").pop() || "bin").replace(/[^a-zA-Z0-9]/g, "").slice(0, 10) || "bin";
   const fileName = `${nanoid(10)}.${ext}`;
   const filePath = `${user.id}/${fileName}`;
-  const buffer = Buffer.from(await file.arrayBuffer());
 
   const storage = await getStorage();
-  await storage.save(filePath, buffer);
+
+  // Stream file to storage instead of buffering entirely in memory
+  const fileStream = file.stream() as ReadableStream<Uint8Array>;
+  await storage.saveStream(filePath, fileStream);
 
   const uploadId = nanoid();
   const now = new Date().toISOString();

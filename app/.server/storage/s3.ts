@@ -21,6 +21,10 @@ export function createS3Storage(): StorageAdapter {
     async save(filePath: string, data: Buffer) {
       await client.send(new PutObjectCommand({ Bucket: bucket(), Key: filePath, Body: data }));
     },
+    async saveStream(filePath: string, stream: ReadableStream<Uint8Array>) {
+      // S3 PutObject accepts a web ReadableStream
+      await client.send(new PutObjectCommand({ Bucket: bucket(), Key: filePath, Body: stream as any }));
+    },
     async read(filePath: string) {
       const res = await client.send(new GetObjectCommand({ Bucket: bucket(), Key: filePath }));
       return Buffer.from(await res.Body!.transformToByteArray());
@@ -30,6 +34,19 @@ export function createS3Storage(): StorageAdapter {
       const size = res.ContentLength ?? 0;
       const stream = res.Body!.transformToWebStream() as ReadableStream<Uint8Array>;
       return { stream, size };
+    },
+    async readRangeStream(filePath: string, start: number, end: number) {
+      const res = await client.send(new GetObjectCommand({ Bucket: bucket(), Key: filePath, Range: `bytes=${start}-${end}` }));
+      const totalSize = res.ContentLength ?? (end - start + 1);
+      // Parse total size from Content-Range header if available
+      const contentRange = res.ContentRange; // e.g. "bytes 0-999/5000"
+      let fullSize = totalSize;
+      if (contentRange) {
+        const match = contentRange.match(/\/(\d+)/);
+        if (match) fullSize = parseInt(match[1], 10);
+      }
+      const stream = res.Body!.transformToWebStream() as ReadableStream<Uint8Array>;
+      return { stream, size: end - start + 1, totalSize: fullSize };
     },
     async delete(filePath: string) {
       try { await client.send(new DeleteObjectCommand({ Bucket: bucket(), Key: filePath })); } catch {}

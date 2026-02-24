@@ -9,10 +9,34 @@ export async function loader({ params, request }: { params: { fileName: string }
   const upload = queryOne<any>("SELECT u.*, us.embed_title, us.embed_description, us.embed_color, us.custom_path, usr.username FROM uploads u LEFT JOIN user_settings us ON u.user_id = us.user_id LEFT JOIN users usr ON u.user_id = usr.id WHERE u.file_name = ?", [params.fileName]);
   if (!upload) throw new Response("Not Found", { status: 404 });
   if (!upload.is_public) throw new Response("Not Found", { status: 404 });
-  execute("UPDATE uploads SET views = views + 1 WHERE id = ?", [upload.id]);
+
+  // Deduplicate view counts: only increment once per upload per visitor per hour
+  const cookieHeader = request.headers.get("Cookie") || "";
+  const viewedKey = `viewed_${upload.id}`;
+  const alreadyViewed = cookieHeader.includes(viewedKey);
+  let setCookieHeader: string | null = null;
+
+  if (!alreadyViewed) {
+    execute("UPDATE uploads SET views = views + 1 WHERE id = ?", [upload.id]);
+    upload.views = (upload.views || 0) + 1;
+    // Set a cookie that expires in 1 hour to prevent re-counting
+    setCookieHeader = `${viewedKey}=1; Path=/v/${params.fileName}; Max-Age=3600; HttpOnly; SameSite=Lax`;
+  }
+
   const baseUrl = getBaseUrl(request);
   const sys = queryOne<any>("SELECT primary_color, background_pattern FROM system_settings LIMIT 1");
-  return { upload, baseUrl, primaryColor: sys?.primary_color || null, backgroundPattern: sys?.background_pattern || "grid" };
+  const data = { upload, baseUrl, primaryColor: sys?.primary_color || null, backgroundPattern: sys?.background_pattern || "grid" };
+
+  if (setCookieHeader) {
+    return new Response(JSON.stringify(data), {
+      headers: {
+        "Content-Type": "application/json",
+        "Set-Cookie": setCookieHeader,
+      },
+    });
+  }
+
+  return data;
 }
 
 export function meta({ data }: { data: any }) {
