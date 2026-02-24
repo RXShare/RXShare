@@ -74,18 +74,26 @@ export function meta({ data }: { data: any }) {
   if (!data?.upload) return [{ title: "Not Found" }];
   const { upload, baseUrl, primaryColor } = data;
   const isImage = upload.mime_type?.startsWith("image/");
+  const isVideo = upload.mime_type?.startsWith("video/");
   const fileUrl = `${baseUrl}/api/files/${upload.file_path}`;
-  const previewUrl = upload.preview_path ? `${baseUrl}/api/files/${upload.preview_path}` : isImage ? fileUrl : null;
+  // For images/videos: use full file as og:image so Discord embeds show it large
+  // For other files: use preview if available
+  const ogImage = isImage ? fileUrl : upload.preview_path ? `${baseUrl}/api/files/${upload.preview_path}` : null;
   const safeColor = (c: string) => /^#[0-9a-fA-F]{3,8}$/.test(c) ? c : "#f97316";
   return [
     { title: upload.embed_title || upload.original_name },
     { name: "description", content: upload.embed_description || `${upload.original_name} - ${formatFileSize(upload.file_size)}` },
     { property: "og:title", content: upload.embed_title || upload.original_name },
     { property: "og:description", content: upload.embed_description || formatFileSize(upload.file_size) },
-    ...(previewUrl ? [{ property: "og:image", content: previewUrl }] : []),
+    ...(ogImage ? [
+      { property: "og:image", content: ogImage },
+      { property: "og:image:width", content: "1200" },
+      { property: "og:image:height", content: "630" },
+    ] : []),
     { property: "og:type", content: isImage ? "image" : "website" },
+    { name: "twitter:card", content: isImage || isVideo ? "summary_large_image" : "summary" },
     { name: "theme-color", content: safeColor(upload.embed_color || primaryColor || "#f97316") },
-    ...(upload.mime_type?.startsWith("video/") ? [
+    ...(isVideo ? [
       { property: "og:video", content: fileUrl },
       { property: "og:video:type", content: upload.mime_type },
     ] : []),
