@@ -36,9 +36,14 @@ export async function action({ request }: { request: Request }) {
       if (key === "embed_color" && typeof val === "string" && !/^#[0-9a-fA-F]{3,8}$/.test(val)) continue;
       // Block reserved custom_path values
       if (key === "custom_path" && typeof val === "string") {
-        const reserved = ["dashboard", "admin", "api", "auth", "setup", "v", "r", "public", "assets", "build", "data"];
+        const reserved = ["dashboard", "admin", "api", "auth", "setup", "v", "r", "u", "s", "public", "assets", "build", "data"];
         const cleaned = val.toLowerCase().replace(/[^a-z0-9_-]/g, "").slice(0, 30);
         if (reserved.includes(cleaned)) return Response.json({ error: "That custom path is reserved" }, { status: 400 });
+        // Enforce uniqueness across users
+        if (cleaned) {
+          const existing = queryOne<any>("SELECT user_id FROM user_settings WHERE custom_path = ? AND user_id != ?", [cleaned, session.user.id]);
+          if (existing) return Response.json({ error: "That custom path is already taken" }, { status: 400 });
+        }
         val = cleaned || null;
       }
       if (key === "sharex_folder_name" && typeof val === "string") {

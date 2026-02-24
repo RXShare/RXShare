@@ -29,9 +29,12 @@ export async function loader({ params, request }: { params: { fileName: string }
   // Check password protection (owner bypasses)
   const needsPassword = !!upload.password_hash && !isOwner;
   if (needsPassword) {
+    const { verifyCookieSignature } = await import("~/routes/api/verify-password");
     const cookieHeader = request.headers.get("Cookie") || "";
-    const pwCookie = `pw_${upload.id}`;
-    if (!cookieHeader.includes(pwCookie)) {
+    const pwCookieName = `pw_${upload.id}`;
+    const pwMatch = cookieHeader.match(new RegExp(`${pwCookieName}=([^;]+)`));
+    const pwCookieValid = pwMatch ? verifyCookieSignature(pwMatch[1]) : false;
+    if (!pwCookieValid) {
       // Return minimal data for password gate
       const sys = queryOne<any>("SELECT primary_color, background_pattern FROM system_settings LIMIT 1");
       return { passwordRequired: true, fileName: params.fileName, originalName: upload.original_name, backgroundPattern: sys?.background_pattern || "grid" };

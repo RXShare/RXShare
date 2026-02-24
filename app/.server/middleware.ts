@@ -33,5 +33,15 @@ export async function appMiddleware(
     if (session) return new Response(null, { status: 302, headers: { Location: "/dashboard" } });
   }
 
-  return next();
+  const response = await next();
+
+  // Add security headers to all HTML responses
+  if (!path.startsWith("/api/")) {
+    response.headers.set("X-Frame-Options", "SAMEORIGIN");
+    response.headers.set("X-Content-Type-Options", "nosniff");
+    response.headers.set("Referrer-Policy", "strict-origin-when-cross-origin");
+    response.headers.set("Permissions-Policy", "camera=(), microphone=(), geolocation=()");
+  }
+
+  return response;
 }

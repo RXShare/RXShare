@@ -3,6 +3,8 @@ import { queryOne } from "~/.server/db";
 import { getSession } from "~/.server/session";
 import crypto from "crypto";
 
+import { resolve } from "path";
+
 const mimeMap: Record<string, string> = {
   jpg: "image/jpeg", jpeg: "image/jpeg", png: "image/png", gif: "image/gif",
   webp: "image/webp", svg: "image/svg+xml", mp4: "video/mp4", webm: "video/webm",
@@ -39,10 +41,14 @@ export async function loader({ request }: { request: Request }) {
   let filePath = url.pathname.replace("/api/files/", "");
   if (!filePath) return new Response("Not Found", { status: 404 });
 
-  // Prevent path traversal
-  filePath = filePath.replace(/\.\./g, "").replace(/\/\//g, "/");
-  if (filePath.startsWith("/")) filePath = filePath.slice(1);
-  if (!filePath || filePath.includes("..")) return new Response("Forbidden", { status: 403 });
+  // Robust path traversal prevention: resolve and verify it stays within bounds
+  filePath = decodeURIComponent(filePath).replace(/\\/g, "/");
+  const resolved = resolve("/", filePath);
+  const normalized = resolved.startsWith("/") ? resolved.slice(1) : resolved;
+  if (!normalized || normalized.includes("..") || normalized.startsWith("/")) {
+    return new Response("Forbidden", { status: 403 });
+  }
+  filePath = normalized;
 
   const storage = await getStorage();
   try {

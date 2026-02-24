@@ -34,10 +34,14 @@ export async function loader({ params, request }: { params: { fileName: string }
     throw new Response("Not Found", { status: 404 });
   }
 
-  // Check password protection
+  // Check password protection (verify HMAC-signed cookie)
   if (upload.password_hash && !isOwner) {
+    const { verifyCookieSignature } = await import("~/routes/api/verify-password");
     const cookieHeader = request.headers.get("Cookie") || "";
-    if (!cookieHeader.includes(`pw_${upload.id}`)) {
+    const pwCookieName = `pw_${upload.id}`;
+    const pwMatch = cookieHeader.match(new RegExp(`${pwCookieName}=([^;]+)`));
+    const pwCookieValid = pwMatch ? verifyCookieSignature(pwMatch[1]) : false;
+    if (!pwCookieValid) {
       throw new Response("Password required", { status: 403 });
     }
   }

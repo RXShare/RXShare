@@ -4,6 +4,7 @@ import { query, queryOne, execute } from "~/.server/db";
 import { validateCsrf } from "~/.server/csrf";
 import { isFeatureEnabled } from "~/.server/features";
 import { isAdmin } from "~/.server/auth";
+import { rateLimit } from "~/.server/rate-limit";
 
 export async function loader({ request }: { request: Request }) {
   const session = await getSession(request);
@@ -23,12 +24,21 @@ export async function action({ request }: { request: Request }) {
   if (request.method === "POST") {
     const body = await request.json();
     const { upload_id, external_url } = body;
+
+    // Rate limit: 30 short link creations per 10 minutes
+    const limited = rateLimit("short-links-create", request, 30, 10 * 60 * 1000);
+    if (limited) return limited;
     
     if (external_url) {
-      // External URL short link
+      // External URL short link — strict validation
       const url = external_url.trim();
-      if (!url.startsWith("http://") && !url.startsWith("https://")) {
-        return Response.json({ error: "URL must start with http:// or https://" }, { status: 400 });
+      try {
+        const parsed = new URL(url);
+        if (!["http:", "https:"].includes(parsed.protocol)) {
+          return Response.json({ error: "URL must use http:// or https://" }, { status: 400 });
+        }
+      } catch {
+        return Response.json({ error: "Invalid URL format" }, { status: 400 });
       }
       const id = nanoid();
       const code = nanoid(6);

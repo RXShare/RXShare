@@ -26,6 +26,22 @@ export async function action({ request }: { request: Request }) {
     if (limited) return limited;
     const { name, url, events } = await request.json();
     if (!name?.trim() || !url?.trim()) return Response.json({ error: "Name and URL required" }, { status: 400 });
+    // Validate URL format and block internal addresses (SSRF)
+    try {
+      const parsed = new URL(url.trim());
+      if (!["http:", "https:"].includes(parsed.protocol)) return Response.json({ error: "URL must use http or https" }, { status: 400 });
+      const host = parsed.hostname.toLowerCase();
+      const blocked = ["localhost", "127.0.0.1", "::1", "[::1]", "0.0.0.0", "169.254.169.254", "metadata.google.internal"];
+      if (blocked.includes(host) || host.endsWith(".local") || host.endsWith(".internal")) {
+        return Response.json({ error: "Internal URLs are not allowed" }, { status: 400 });
+      }
+      const parts = host.split(".").map(Number);
+      if (parts.length === 4 && parts.every(p => !isNaN(p))) {
+        if (parts[0] === 10 || (parts[0] === 172 && parts[1] >= 16 && parts[1] <= 31) || (parts[0] === 192 && parts[1] === 168) || (parts[0] === 169 && parts[1] === 254)) {
+          return Response.json({ error: "Private network URLs are not allowed" }, { status: 400 });
+        }
+      }
+    } catch { return Response.json({ error: "Invalid URL" }, { status: 400 }); }
     const id = nanoid();
     const secret = crypto.randomBytes(32).toString("hex");
     execute("INSERT INTO webhooks (id, name, url, events, secret) VALUES (?, ?, ?, ?, ?)",
