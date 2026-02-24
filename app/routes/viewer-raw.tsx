@@ -2,8 +2,6 @@ import { queryOne, execute } from "~/.server/db";
 import { getSession } from "~/.server/session";
 import { getStorage } from "~/.server/storage";
 
-const dangerousTypes = ["text/html", "image/svg+xml", "text/javascript", "application/javascript"];
-
 function parseRange(rangeHeader: string, totalSize: number): { start: number; end: number } | null {
   const match = rangeHeader.match(/bytes=(\d*)-(\d*)/);
   if (!match) return null;
@@ -48,7 +46,8 @@ export async function loader({ params, request }: { params: { fileName: string }
 
   const storage = await getStorage();
   const safeName = upload.original_name.replace(/["\r\n]/g, "_");
-  const safeType = dangerousTypes.includes(upload.mime_type) ? "application/octet-stream" : upload.mime_type;
+  const dangerousTypes = ["text/html", "image/svg+xml", "text/javascript", "application/javascript"];
+  const contentType = dangerousTypes.includes(upload.mime_type) ? "application/octet-stream" : (upload.mime_type || "application/octet-stream");
   const rangeHeader = request.headers.get("Range");
 
   // Track downloads (only on initial full request, not range continuations)
@@ -70,13 +69,12 @@ export async function loader({ params, request }: { params: { fileName: string }
     return new Response(stream, {
       status: 206,
       headers: {
-        "Content-Type": safeType,
+        "Content-Type": contentType,
         "Content-Disposition": `inline; filename="${safeName}"`,
         "Content-Range": `bytes ${start}-${end}/${totalSize}`,
         "Content-Length": String(end - start + 1),
         "Accept-Ranges": "bytes",
         "Cache-Control": "public, max-age=31536000, immutable",
-        "Content-Security-Policy": "default-src 'none'; style-src 'unsafe-inline'",
         "X-Content-Type-Options": "nosniff",
       },
     });
@@ -85,12 +83,11 @@ export async function loader({ params, request }: { params: { fileName: string }
   const { stream, size } = await storage.readStream(upload.file_path);
   return new Response(stream, {
     headers: {
-      "Content-Type": safeType,
+      "Content-Type": contentType,
       "Content-Disposition": `inline; filename="${safeName}"`,
       "Content-Length": String(size),
       "Accept-Ranges": "bytes",
       "Cache-Control": "public, max-age=31536000, immutable",
-      "Content-Security-Policy": "default-src 'none'; style-src 'unsafe-inline'",
       "X-Content-Type-Options": "nosniff",
     },
   });
