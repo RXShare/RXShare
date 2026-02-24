@@ -46,28 +46,6 @@ export default function UploadsPage() {
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [zipping, setZipping] = useState(false);
 
-  // Ctrl+V paste upload for images/gifs
-  useEffect(() => {
-    const handlePaste = (e: ClipboardEvent) => {
-      const items = e.clipboardData?.items;
-      if (!items) return;
-      for (const item of Array.from(items)) {
-        if (item.type.startsWith("image/")) {
-          e.preventDefault();
-          const file = item.getAsFile();
-          if (file) {
-            const ext = file.type.split("/")[1]?.replace("jpeg", "jpg") || "png";
-            const named = new File([file], `paste-${Date.now()}.${ext}`, { type: file.type });
-            handleUpload(named);
-          }
-          return;
-        }
-      }
-    };
-    document.addEventListener("paste", handlePaste);
-    return () => document.removeEventListener("paste", handlePaste);
-  }, [handleUpload]);
-
   const toggleSelect = (id: string) => {
     setSelectedIds(prev => {
       const next = new Set(prev);
@@ -132,6 +110,28 @@ export default function UploadsPage() {
     } catch (err: any) { toast({ title: "Upload failed", description: err.message, variant: "destructive" }); }
     finally { setUploading(false); setUploadProgress(0); }
   }, [settings, totalSize, quota, revalidator, toast]);
+
+  // Ctrl+V paste upload for images/gifs
+  useEffect(() => {
+    const handlePaste = (e: ClipboardEvent) => {
+      const items = e.clipboardData?.items;
+      if (!items) return;
+      for (const item of Array.from(items)) {
+        if (item.type.startsWith("image/")) {
+          e.preventDefault();
+          const file = item.getAsFile();
+          if (file) {
+            const ext = file.type.split("/")[1]?.replace("jpeg", "jpg") || "png";
+            const named = new File([file], `paste-${Date.now()}.${ext}`, { type: file.type });
+            handleUpload(named);
+          }
+          return;
+        }
+      }
+    };
+    document.addEventListener("paste", handlePaste);
+    return () => document.removeEventListener("paste", handlePaste);
+  }, [handleUpload]);
 
   const handleDrop = useCallback((e: React.DragEvent) => {
     e.preventDefault(); setDragActive(false);
