@@ -79,6 +79,8 @@ export default function Viewer() {
             <p className="text-xs sm:text-sm text-gray-500 flex items-center gap-2">
               {formatFileSize(upload.file_size)} <span>•</span>
               <Icon name="visibility" className="text-sm" /> {upload.views} views
+              <span>•</span>
+              <Icon name="download" className="text-sm" /> {upload.downloads || 0} downloads
             </p>
           </div>
           <div className="flex gap-2 shrink-0">

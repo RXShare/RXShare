@@ -116,5 +116,6 @@ export function getMigrationUpdates(): string[] {
     "ALTER TABLE system_settings ADD COLUMN dashboard_layout TEXT NOT NULL DEFAULT 'header'",
     "ALTER TABLE system_settings ADD COLUMN logo_url TEXT",
     "ALTER TABLE system_settings ADD COLUMN background_pattern TEXT NOT NULL DEFAULT 'grid'",
+    "ALTER TABLE uploads ADD COLUMN downloads INTEGER NOT NULL DEFAULT 0",
   ];
 }

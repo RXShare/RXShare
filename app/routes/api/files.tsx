@@ -1,4 +1,6 @@
 import { getStorage } from "~/.server/storage";
+import { queryOne } from "~/.server/db";
+import crypto from "crypto";
 
 const mimeMap: Record<string, string> = {
   jpg: "image/jpeg", jpeg: "image/jpeg", png: "image/png", gif: "image/gif",
@@ -49,14 +51,28 @@ export async function loader({ request }: { request: Request }) {
     const contentType = getContentType(filePath);
     const rangeHeader = request.headers.get("Range");
 
+    // Generate ETag from file path + size for conditional requests
+    const fileSize = await storage.getSize(filePath);
+    const etag = `"${crypto.createHash("md5").update(`${filePath}-${fileSize}`).digest("hex")}"`;
+
+    // Check If-None-Match for conditional requests
+    const ifNoneMatch = request.headers.get("If-None-Match");
+    if (ifNoneMatch === etag) {
+      return new Response(null, { status: 304 });
+    }
+
+    // Look up original filename for Content-Disposition
+    const fileName = filePath.split("/").pop() || "";
+    const upload = queryOne<any>("SELECT original_name FROM uploads WHERE file_path = ? OR file_name = ?", [filePath, fileName]);
+    const originalName = upload?.original_name?.replace(/["\r\n]/g, "_");
+
     // Range request (for video/audio seeking)
     if (rangeHeader) {
-      const totalSize = await storage.getSize(filePath);
-      const range = parseRange(rangeHeader, totalSize);
+      const range = parseRange(rangeHeader, fileSize);
       if (!range) {
         return new Response("Range Not Satisfiable", {
           status: 416,
-          headers: { "Content-Range": `bytes */${totalSize}` },
+          headers: { "Content-Range": `bytes */${fileSize}` },
         });
       }
       const { start, end } = range;
@@ -65,10 +81,12 @@ export async function loader({ request }: { request: Request }) {
         status: 206,
         headers: {
           "Content-Type": contentType,
-          "Content-Range": `bytes ${start}-${end}/${totalSize}`,
+          "Content-Range": `bytes ${start}-${end}/${fileSize}`,
           "Content-Length": String(end - start + 1),
           "Accept-Ranges": "bytes",
           "Cache-Control": "public, max-age=31536000, immutable",
+          "ETag": etag,
+          ...(originalName ? { "Content-Disposition": `inline; filename="${originalName}"` } : {}),
           "Content-Security-Policy": "default-src 'none'; style-src 'unsafe-inline'",
           "X-Content-Type-Options": "nosniff",
         },
@@ -76,13 +94,15 @@ export async function loader({ request }: { request: Request }) {
     }
 
     // Full response
-    const { stream, size } = await storage.readStream(filePath);
+    const { stream } = await storage.readStream(filePath);
     return new Response(stream, {
       headers: {
         "Content-Type": contentType,
         "Cache-Control": "public, max-age=31536000, immutable",
-        "Content-Length": String(size),
+        "Content-Length": String(fileSize),
         "Accept-Ranges": "bytes",
+        "ETag": etag,
+        ...(originalName ? { "Content-Disposition": `inline; filename="${originalName}"` } : {}),
         "Content-Security-Policy": "default-src 'none'; style-src 'unsafe-inline'",
         "X-Content-Type-Options": "nosniff",
       },

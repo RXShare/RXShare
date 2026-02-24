@@ -26,8 +26,13 @@ export default [
   route("api/user/settings", "routes/api/user.settings.tsx"),
   route("api/admin/system-settings", "routes/api/admin.system-settings.tsx"),
   route("api/admin/users/:userId", "routes/api/admin.users.$userId.tsx"),
+  route("api/admin/users/create", "routes/api/admin.users.create.tsx"),
+  route("api/download-zip", "routes/api/download-zip.tsx"),
   route("api/system-settings/public", "routes/api/system-settings.public.tsx"),
   route("api/logo", "routes/api/logo.tsx"),
   route("api/files/*", "routes/api/files.tsx"),
   route("api/thumb/:id", "routes/api/thumb.$id.tsx"),
+  // Custom path catch-all (must be last)
+  route(":customPath", "routes/custom-path.tsx"),
+  route(":customPath/:fileName", "routes/custom-path.tsx", { id: "custom-path-file" }),
 ] satisfies RouteConfig;

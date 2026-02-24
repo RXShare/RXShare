@@ -1,4 +1,4 @@
-import { queryOne } from "~/.server/db";
+import { queryOne, execute } from "~/.server/db";
 import { getStorage } from "~/.server/storage";
 
 const dangerousTypes = ["text/html", "image/svg+xml", "text/javascript", "application/javascript"];
@@ -25,6 +25,11 @@ export async function loader({ params, request }: { params: { fileName: string }
   const safeName = upload.original_name.replace(/["\r\n]/g, "_");
   const safeType = dangerousTypes.includes(upload.mime_type) ? "application/octet-stream" : upload.mime_type;
   const rangeHeader = request.headers.get("Range");
+
+  // Track downloads (only on initial full request, not range continuations)
+  if (!rangeHeader) {
+    try { execute("UPDATE uploads SET downloads = downloads + 1 WHERE id = ?", [upload.id]); } catch {}
+  }
 
   if (rangeHeader) {
     const totalSize = await storage.getSize(upload.file_path);

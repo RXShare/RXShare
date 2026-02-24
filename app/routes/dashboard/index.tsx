@@ -1,4 +1,4 @@
-import { useState, useRef, useCallback } from "react";
+import { useState, useRef, useCallback, useEffect } from "react";
 import { useLoaderData, useRevalidator, useOutletContext } from "react-router";
 import { getSession } from "~/.server/session";
 import { query, queryOne, execute } from "~/.server/db";
@@ -43,6 +43,62 @@ export default function UploadsPage() {
   const [dragActive, setDragActive] = useState(false);
   const [previewFile, setPreviewFile] = useState<any>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  const [zipping, setZipping] = useState(false);
+
+  // Ctrl+V paste upload for images/gifs
+  useEffect(() => {
+    const handlePaste = (e: ClipboardEvent) => {
+      const items = e.clipboardData?.items;
+      if (!items) return;
+      for (const item of Array.from(items)) {
+        if (item.type.startsWith("image/")) {
+          e.preventDefault();
+          const file = item.getAsFile();
+          if (file) {
+            const ext = file.type.split("/")[1]?.replace("jpeg", "jpg") || "png";
+            const named = new File([file], `paste-${Date.now()}.${ext}`, { type: file.type });
+            handleUpload(named);
+          }
+          return;
+        }
+      }
+    };
+    document.addEventListener("paste", handlePaste);
+    return () => document.removeEventListener("paste", handlePaste);
+  }, [handleUpload]);
+
+  const toggleSelect = (id: string) => {
+    setSelectedIds(prev => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id); else next.add(id);
+      return next;
+    });
+  };
+
+  const selectAll = () => {
+    if (selectedIds.size === filteredUploads.length) setSelectedIds(new Set());
+    else setSelectedIds(new Set(filteredUploads.map((u: any) => u.id)));
+  };
+
+  const downloadZip = async () => {
+    if (selectedIds.size === 0) return;
+    setZipping(true);
+    try {
+      const res = await fetch("/api/download-zip", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", ...(getCsrfToken() ? { "X-CSRF-Token": getCsrfToken()! } : {}) },
+        body: JSON.stringify({ ids: Array.from(selectedIds) }),
+      });
+      if (!res.ok) { const d = await res.json(); throw new Error(d.error); }
+      const blob = await res.blob();
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a"); a.href = url; a.download = "rxshare-download.zip"; a.click();
+      URL.revokeObjectURL(url);
+      setSelectedIds(new Set());
+    } catch (err: any) { toast({ title: "Zip failed", description: err.message, variant: "destructive" }); }
+    finally { setZipping(false); }
+  };
 
   const filteredUploads = uploads.filter((u: any) =>
     u.original_name.toLowerCase().includes(search.toLowerCase()) ||
@@ -222,14 +278,33 @@ export default function UploadsPage() {
       <div className="flex items-center justify-between glass-card rounded-2xl p-1">
         <div className="flex items-center gap-3 px-5 py-3">
           <h2 className="text-xl font-bold text-white">Recent Files</h2>
+          {selectedIds.size > 0 && (
+            <div className="flex items-center gap-2 ml-4">
+              <span className="text-xs text-gray-400">{selectedIds.size} selected</span>
+              <button onClick={downloadZip} disabled={zipping}
+                className="flex items-center gap-1.5 px-3 py-1.5 text-xs text-white bg-primary hover:bg-[var(--primary-hover)] rounded-lg shadow-glow-primary transition-all disabled:opacity-50">
+                <Icon name="folder_zip" className="text-sm" /> {zipping ? "Zipping..." : "Download Zip"}
+              </button>
+              <button onClick={() => setSelectedIds(new Set())}
+                className="flex items-center gap-1 px-2 py-1.5 text-xs text-gray-400 hover:text-white hover:bg-white/5 rounded-lg transition-colors">
+                <Icon name="close" className="text-sm" /> Clear
+              </button>
+            </div>
+          )}
         </div>
-        <div className="flex items-center gap-2 bg-[#0a0a0a]/60 p-1 rounded-xl border border-white/5 mr-2 shadow-[inset_0_2px_4px_rgba(0,0,0,0.3)]">
+        <div className="flex items-center gap-2 mr-2">
+          <button onClick={selectAll}
+            className={cn("p-2 rounded-lg transition-colors text-sm", selectedIds.size === filteredUploads.length && filteredUploads.length > 0 ? "bg-primary/20 text-primary" : "text-gray-500 hover:text-gray-300 hover:bg-white/5")}>
+            <Icon name="select_all" className="text-lg" />
+          </button>
+          <div className="flex items-center gap-2 bg-[#0a0a0a]/60 p-1 rounded-xl border border-white/5 shadow-[inset_0_2px_4px_rgba(0,0,0,0.3)]">
           <button onClick={() => setViewMode("grid")} className={cn("p-2 rounded-lg transition-colors", viewMode === "grid" ? "bg-white/10 text-white shadow-sm" : "text-gray-500 hover:text-gray-300 hover:bg-white/5")}>
             <Icon name="grid_view" className="text-lg" />
           </button>
           <button onClick={() => setViewMode("list")} className={cn("p-2 rounded-lg transition-colors", viewMode === "list" ? "bg-white/10 text-white shadow-sm" : "text-gray-500 hover:text-gray-300 hover:bg-white/5")}>
             <Icon name="list" className="text-lg" />
           </button>
+          </div>
         </div>
       </div>
 
@@ -246,10 +321,15 @@ export default function UploadsPage() {
             const ext = upload.original_name.split(".").pop()?.toUpperCase() || "FILE";
             return (
               <div key={upload.id}
-                className="glass-card rounded-2xl group relative overflow-hidden flex flex-col shadow-lg hover:-translate-y-1 cursor-pointer"
+                className={cn("glass-card rounded-2xl group relative overflow-hidden flex flex-col shadow-lg hover:-translate-y-1 cursor-pointer", selectedIds.has(upload.id) && "ring-2 ring-primary")}
                 onClick={() => setPreviewFile(upload)}>
-                {/* File type badge — exact Stitch */}
-                <div className="absolute top-3 left-3 z-20">
+                {/* Selection checkbox */}
+                <div className="absolute top-3 left-3 z-20 flex items-center gap-2" onClick={(e) => e.stopPropagation()}>
+                  <button onClick={() => toggleSelect(upload.id)}
+                    className={cn("w-5 h-5 rounded border flex items-center justify-center transition-all text-xs",
+                      selectedIds.has(upload.id) ? "bg-primary border-primary text-white" : "border-white/20 bg-black/40 backdrop-blur-md text-transparent hover:border-white/40")}>
+                    {selectedIds.has(upload.id) && <Icon name="check" className="text-xs" />}
+                  </button>
                   <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-medium bg-black/40 text-white backdrop-blur-md border border-white/10">{ext}</span>
                 </div>
                 {/* Actions — exact Stitch: hidden, show on hover */}
@@ -320,6 +400,13 @@ export default function UploadsPage() {
           <table className="w-full text-left border-collapse">
             <thead>
               <tr className="bg-white/5 border-b border-white/10 text-xs font-semibold uppercase text-gray-400 tracking-wider">
+                <th className="px-3 py-5 w-10" onClick={(e) => e.stopPropagation()}>
+                  <button onClick={selectAll}
+                    className={cn("w-5 h-5 rounded border flex items-center justify-center transition-all text-xs",
+                      selectedIds.size === filteredUploads.length && filteredUploads.length > 0 ? "bg-primary border-primary text-white" : "border-white/20 bg-transparent text-transparent hover:border-white/40")}>
+                    {selectedIds.size === filteredUploads.length && filteredUploads.length > 0 && <Icon name="check" className="text-xs" />}
+                  </button>
+                </th>
                 <th className="px-6 py-5">File</th>
                 <th className="px-6 py-5">Size</th>
                 <th className="px-6 py-5">Status</th>
@@ -329,7 +416,14 @@ export default function UploadsPage() {
             </thead>
             <tbody className="divide-y divide-white/5">
               {filteredUploads.map((upload: any) => (
-                <tr key={upload.id} className="group hover:bg-white/[0.03] transition-colors duration-200 cursor-pointer" onClick={() => setPreviewFile(upload)}>
+                <tr key={upload.id} className={cn("group hover:bg-white/[0.03] transition-colors duration-200 cursor-pointer", selectedIds.has(upload.id) && "bg-primary/5")} onClick={() => setPreviewFile(upload)}>
+                  <td className="px-3 py-4" onClick={(e) => e.stopPropagation()}>
+                    <button onClick={() => toggleSelect(upload.id)}
+                      className={cn("w-5 h-5 rounded border flex items-center justify-center transition-all text-xs",
+                        selectedIds.has(upload.id) ? "bg-primary border-primary text-white" : "border-white/20 bg-transparent text-transparent hover:border-white/40")}>
+                      {selectedIds.has(upload.id) && <Icon name="check" className="text-xs" />}
+                    </button>
+                  </td>
                   <td className="px-6 py-4">
                     <div className="flex items-center gap-4">
                       <Icon name={getFileIconName(upload.mime_type)} className={cn("text-2xl", getFileIconColor(upload.mime_type))} />

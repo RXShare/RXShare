@@ -101,6 +101,12 @@ function UsersTab({ users, allUploads, currentUserId, toast, revalidator }: any)
   const [editUser, setEditUser] = useState<any>(null);
   const [editQuota, setEditQuota] = useState("");
   const [editMaxUpload, setEditMaxUpload] = useState("");
+  const [showCreate, setShowCreate] = useState(false);
+  const [createEmail, setCreateEmail] = useState("");
+  const [createUsername, setCreateUsername] = useState("");
+  const [createPassword, setCreatePassword] = useState("");
+  const [createIsAdmin, setCreateIsAdmin] = useState(false);
+  const [creating, setCreating] = useState(false);
 
   const filtered = users.filter((u: any) =>
     (u.username || "").toLowerCase().includes(search.toLowerCase()) ||
@@ -136,6 +142,25 @@ function UsersTab({ users, allUploads, currentUserId, toast, revalidator }: any)
     if (res.ok) { setEditUser(null); revalidator.revalidate(); toast({ title: "User settings updated" }); }
   };
 
+  const handleCreateUser = async () => {
+    if (!createEmail || !createUsername || !createPassword) {
+      toast({ title: "All fields are required", variant: "destructive" }); return;
+    }
+    setCreating(true);
+    try {
+      const res = await fetch("/api/admin/users/create", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", ...(getCsrfToken() ? { "X-CSRF-Token": getCsrfToken()! } : {}) },
+        body: JSON.stringify({ email: createEmail, username: createUsername, password: createPassword, is_admin: createIsAdmin }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error);
+      setShowCreate(false); setCreateEmail(""); setCreateUsername(""); setCreatePassword(""); setCreateIsAdmin(false);
+      revalidator.revalidate(); toast({ title: "User created" });
+    } catch (err: any) { toast({ title: "Failed", description: err.message, variant: "destructive" }); }
+    finally { setCreating(false); }
+  };
+
   const inputCls = "block w-full px-4 py-2.5 border border-white/10 rounded-lg bg-[#0a0a0a] text-gray-300 placeholder-gray-600 focus:outline-none focus:ring-1 focus:ring-primary focus:border-primary text-sm transition-all";
 
   return (
@@ -147,6 +172,10 @@ function UsersTab({ users, allUploads, currentUserId, toast, revalidator }: any)
           <input className="block w-full pl-10 pr-4 py-2.5 border border-white/10 rounded-lg bg-[#141414] text-gray-300 placeholder-gray-600 focus:outline-none focus:ring-1 focus:ring-primary focus:border-primary text-sm shadow-[inset_0_1px_0_0_rgba(255,255,255,0.05)]"
             placeholder="Search users..." value={search} onChange={(e) => setSearch(e.target.value)} />
         </div>
+        <button onClick={() => setShowCreate(true)}
+          className="bg-primary hover:bg-[var(--primary-hover)] text-white px-4 py-2.5 rounded-lg text-sm font-bold transition-all shadow-glow-primary flex items-center gap-2 hover:scale-105">
+          <Icon name="person_add" className="text-lg" /> Create User
+        </button>
       </div>
 
       {/* Users table */}
@@ -250,6 +279,26 @@ function UsersTab({ users, allUploads, currentUserId, toast, revalidator }: any)
           <DialogFooter>
             <button onClick={() => setEditUser(null)} className="px-4 py-2 text-sm text-gray-400 border border-white/10 rounded-lg hover:bg-white/5 transition-colors">Cancel</button>
             <button onClick={handleEditSave} className="px-4 py-2 text-sm text-white bg-primary hover:bg-[var(--primary-hover)] rounded-lg shadow-glow-primary transition-all">Save</button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Create User dialog */}
+      <Dialog open={showCreate} onOpenChange={() => setShowCreate(false)}>
+        <DialogContent className="bg-[#141414] border-white/10">
+          <DialogHeader><DialogTitle className="text-white">Create User</DialogTitle><DialogDescription className="text-gray-500">Add a new user to the system.</DialogDescription></DialogHeader>
+          <div className="space-y-4">
+            <div className="space-y-2"><label className="text-sm font-medium text-gray-400">Email</label><input type="email" value={createEmail} onChange={(e) => setCreateEmail(e.target.value)} className={inputCls} placeholder="user@example.com" /></div>
+            <div className="space-y-2"><label className="text-sm font-medium text-gray-400">Username</label><input value={createUsername} onChange={(e) => setCreateUsername(e.target.value)} className={inputCls} placeholder="username" /></div>
+            <div className="space-y-2"><label className="text-sm font-medium text-gray-400">Password</label><input type="password" value={createPassword} onChange={(e) => setCreatePassword(e.target.value)} className={inputCls} placeholder="••••••••" /></div>
+            <div className="flex items-center justify-between">
+              <div><p className="text-sm font-medium text-white">Admin</p><p className="text-xs text-gray-500">Grant admin privileges</p></div>
+              <Switch checked={createIsAdmin} onCheckedChange={setCreateIsAdmin} />
+            </div>
+          </div>
+          <DialogFooter>
+            <button onClick={() => setShowCreate(false)} className="px-4 py-2 text-sm text-gray-400 border border-white/10 rounded-lg hover:bg-white/5 transition-colors">Cancel</button>
+            <button onClick={handleCreateUser} disabled={creating} className="px-4 py-2 text-sm text-white bg-primary hover:bg-[var(--primary-hover)] rounded-lg shadow-glow-primary transition-all disabled:opacity-50">{creating ? "Creating..." : "Create"}</button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
