@@ -7,6 +7,8 @@ import { getBaseUrl } from "~/.server/base-url";
 import { rateLimit } from "~/.server/rate-limit";
 import { verifyApiToken } from "~/.server/auth";
 import { validateCsrf } from "~/.server/csrf";
+import { logAudit, getClientIp } from "~/.server/audit";
+import { dispatchWebhook } from "~/.server/webhooks";
 
 async function authenticateRequest(request: Request) {
   // Check session cookie first
@@ -79,6 +81,9 @@ export async function action({ request }: { request: Request }) {
   );
 
   execute("UPDATE user_settings SET disk_used = disk_used + ? WHERE user_id = ?", [file.size, user.id]);
+
+  logAudit("upload", { userId: user.id, targetType: "upload", targetId: uploadId, details: file.name, ip: getClientIp(request) });
+  dispatchWebhook("upload", { id: uploadId, fileName, originalName: file.name, size: file.size, mimeType: file.type });
 
   const baseUrl = getBaseUrl(request);
   return Response.json({

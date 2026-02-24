@@ -117,5 +117,71 @@ export function getMigrationUpdates(): string[] {
     "ALTER TABLE system_settings ADD COLUMN logo_url TEXT",
     "ALTER TABLE system_settings ADD COLUMN background_pattern TEXT NOT NULL DEFAULT 'grid'",
     "ALTER TABLE uploads ADD COLUMN downloads INTEGER NOT NULL DEFAULT 0",
+    // File expiration & password protection
+    "ALTER TABLE uploads ADD COLUMN expires_at TEXT",
+    "ALTER TABLE uploads ADD COLUMN password_hash TEXT",
+    // Folder support
+    "ALTER TABLE uploads ADD COLUMN folder_id TEXT",
+  ];
+}
+
+export function getNewTablesSQL(dbType: DbType): string[] {
+  const autoTs = dbType === "sqlite"
+    ? "TEXT NOT NULL DEFAULT (datetime('now'))"
+    : "DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP";
+  const autoTsNullable = dbType === "sqlite" ? "TEXT" : "DATETIME NULL";
+  const textType = "TEXT";
+  const intType = "INTEGER";
+  const intBool = "INTEGER";
+
+  return [
+    // Folders
+    `CREATE TABLE IF NOT EXISTS folders (
+      id ${textType} PRIMARY KEY,
+      user_id ${textType} NOT NULL,
+      name ${textType} NOT NULL,
+      is_public ${intBool} NOT NULL DEFAULT 1,
+      created_at ${autoTs},
+      FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+    )`,
+    // Audit log
+    `CREATE TABLE IF NOT EXISTS audit_logs (
+      id ${textType} PRIMARY KEY,
+      user_id ${textType},
+      action ${textType} NOT NULL,
+      target_type ${textType},
+      target_id ${textType},
+      details ${textType},
+      ip_address ${textType},
+      created_at ${autoTs}
+    )`,
+    // Webhooks
+    `CREATE TABLE IF NOT EXISTS webhooks (
+      id ${textType} PRIMARY KEY,
+      name ${textType} NOT NULL,
+      url ${textType} NOT NULL,
+      events ${textType} NOT NULL DEFAULT 'upload,delete',
+      is_active ${intBool} NOT NULL DEFAULT 1,
+      secret ${textType},
+      created_at ${autoTs}
+    )`,
+    // Invites
+    `CREATE TABLE IF NOT EXISTS invites (
+      id ${textType} PRIMARY KEY,
+      code ${textType} NOT NULL UNIQUE,
+      created_by ${textType} NOT NULL,
+      used_by ${textType},
+      max_uses ${intType} NOT NULL DEFAULT 1,
+      uses ${intType} NOT NULL DEFAULT 0,
+      expires_at ${autoTsNullable},
+      created_at ${autoTs},
+      FOREIGN KEY (created_by) REFERENCES users(id) ON DELETE CASCADE
+    )`,
+    // Indexes for new tables
+    "CREATE INDEX IF NOT EXISTS idx_folders_user_id ON folders(user_id)",
+    "CREATE INDEX IF NOT EXISTS idx_uploads_folder_id ON uploads(folder_id)",
+    "CREATE INDEX IF NOT EXISTS idx_audit_logs_created_at ON audit_logs(created_at)",
+    "CREATE INDEX IF NOT EXISTS idx_audit_logs_user_id ON audit_logs(user_id)",
+    "CREATE INDEX IF NOT EXISTS idx_invites_code ON invites(code)",
   ];
 }

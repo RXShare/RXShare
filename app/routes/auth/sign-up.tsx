@@ -26,9 +26,12 @@ export default function SignUp() {
   const [confirmPassword, setConfirmPassword] = useState("");
   const [loading, setLoading] = useState(false);
 
+  // Read invite code from URL param
+  const inviteCode = typeof window !== "undefined" ? new URLSearchParams(window.location.search).get("invite") || "" : "";
+
   const logo = settings?.logo_url?.trim() || DEFAULT_LOGO;
 
-  if (settings && !settings.allow_registration) {
+  if (settings && !settings.allow_registration && !inviteCode) {
     return (
       <div className="min-h-screen flex items-center justify-center p-4">
         <div className="glass-card rounded-2xl p-8 w-full max-w-md text-center shadow-glow-card">
@@ -53,7 +56,7 @@ export default function SignUp() {
     try {
       const res = await fetch("/api/auth/signup", {
         method: "POST", headers: { "Content-Type": "application/json", ...(getCsrfToken() ? { "X-CSRF-Token": getCsrfToken()! } : {}) },
-        body: JSON.stringify({ email, password, username }),
+        body: JSON.stringify({ email, password, username, ...(inviteCode ? { invite_code: inviteCode } : {}) }),
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "Sign up failed");
@@ -84,6 +87,12 @@ export default function SignUp() {
           </div>
           <div className="px-10 pb-10">
             <form onSubmit={handleSignUp} className="space-y-4">
+              {inviteCode && (
+                <div className="flex items-center gap-2 px-3 py-2 rounded-lg bg-primary/10 border border-primary/20 text-sm text-primary">
+                  <span className="material-symbols-rounded text-lg">mail</span>
+                  Invite code applied
+                </div>
+              )}
               <div className="space-y-2">
                 <label className="text-sm font-medium text-gray-400">Email</label>
                 <input type="email" value={email} onChange={(e) => setEmail(e.target.value)} required className={inputCls} placeholder="you@example.com" />

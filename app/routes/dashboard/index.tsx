@@ -45,6 +45,13 @@ export default function UploadsPage() {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [zipping, setZipping] = useState(false);
+  const [settingsFile, setSettingsFile] = useState<any>(null);
+  const [filePassword, setFilePassword] = useState("");
+  const [fileExpiry, setFileExpiry] = useState("");
+  const [folders, setFolders] = useState<any[]>([]);
+  const [newFolderName, setNewFolderName] = useState("");
+  const [activeFolder, setActiveFolder] = useState<string | null>(null);
+  const [focusIndex, setFocusIndex] = useState(-1);
 
   const toggleSelect = (id: string) => {
     setSelectedIds(prev => {
@@ -78,10 +85,11 @@ export default function UploadsPage() {
     finally { setZipping(false); }
   };
 
-  const filteredUploads = uploads.filter((u: any) =>
-    u.original_name.toLowerCase().includes(search.toLowerCase()) ||
-    u.file_name.toLowerCase().includes(search.toLowerCase())
-  );
+  const filteredUploads = uploads.filter((u: any) => {
+    const matchesSearch = u.original_name.toLowerCase().includes(search.toLowerCase()) || u.file_name.toLowerCase().includes(search.toLowerCase());
+    const matchesFolder = !activeFolder || u.folder_id === activeFolder;
+    return matchesSearch && matchesFolder;
+  });
 
   const totalSize = uploads.reduce((acc: number, u: any) => acc + u.file_size, 0);
   const quota = settings?.disk_quota || 1073741824;
@@ -132,6 +140,89 @@ export default function UploadsPage() {
     document.addEventListener("paste", handlePaste);
     return () => document.removeEventListener("paste", handlePaste);
   }, [handleUpload]);
+
+  // Fetch folders
+  useEffect(() => {
+    fetch("/api/folders").then(r => r.json()).then(d => { if (d.folders) setFolders(d.folders); }).catch(() => {});
+  }, []);
+
+  // Keyboard shortcuts
+  useEffect(() => {
+    const handler = (e: KeyboardEvent) => {
+      // Don't trigger when typing in inputs
+      if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) return;
+
+      if (e.key === "j" || e.key === "ArrowDown") { e.preventDefault(); setFocusIndex(i => Math.min(i + 1, filteredUploads.length - 1)); }
+      if (e.key === "k" || e.key === "ArrowUp") { e.preventDefault(); setFocusIndex(i => Math.max(i - 1, 0)); }
+      if (e.key === "Enter" && focusIndex >= 0) { e.preventDefault(); setPreviewFile(filteredUploads[focusIndex]); }
+      if (e.key === "Escape") { setPreviewFile(null); setSelectedIds(new Set()); setFocusIndex(-1); }
+      if (e.key === "x" && focusIndex >= 0) { e.preventDefault(); toggleSelect(filteredUploads[focusIndex].id); }
+      if (e.key === "a" && (e.ctrlKey || e.metaKey)) { e.preventDefault(); selectAll(); }
+      if (e.key === "u") { e.preventDefault(); fileInputRef.current?.click(); }
+      if (e.key === "g") { e.preventDefault(); setViewMode("grid"); }
+      if (e.key === "l") { e.preventDefault(); setViewMode("list"); }
+      if (e.key === "Delete" && focusIndex >= 0) { e.preventDefault(); deleteUpload(filteredUploads[focusIndex]); }
+      if (e.key === "c" && focusIndex >= 0) { e.preventDefault(); copyLink(filteredUploads[focusIndex].file_name); }
+      if (e.key === "/" || (e.key === "k" && (e.ctrlKey || e.metaKey))) {
+        e.preventDefault();
+        document.querySelector<HTMLInputElement>('input[placeholder*="Search"]')?.focus();
+      }
+    };
+    document.addEventListener("keydown", handler);
+    return () => document.removeEventListener("keydown", handler);
+  }, [focusIndex, filteredUploads, selectAll, toggleSelect, deleteUpload, copyLink]);
+
+  const saveFileSettings = async () => {
+    if (!settingsFile) return;
+    const updates: any = {};
+    if (fileExpiry) updates.expires_at = new Date(Date.now() + parseInt(fileExpiry) * 3600000).toISOString();
+    if (fileExpiry === "0") updates.expires_at = null;
+    if (filePassword !== undefined) updates.password = filePassword || null;
+    const res = await fetch(`/api/uploads/${settingsFile.id}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json", ...(getCsrfToken() ? { "X-CSRF-Token": getCsrfToken()! } : {}) },
+      body: JSON.stringify(updates),
+    });
+    if (res.ok) { setSettingsFile(null); setFilePassword(""); setFileExpiry(""); revalidator.revalidate(); toast({ title: "File settings updated" }); }
+  };
+
+  const createFolder = async () => {
+    if (!newFolderName.trim()) return;
+    const res = await fetch("/api/folders", {
+      method: "POST",
+      headers: { "Content-Type": "application/json", ...(getCsrfToken() ? { "X-CSRF-Token": getCsrfToken()! } : {}) },
+      body: JSON.stringify({ name: newFolderName.trim() }),
+    });
+    if (res.ok) {
+      const d = await res.json();
+      setFolders(prev => [d, ...prev]);
+      setNewFolderName("");
+      toast({ title: "Folder created" });
+    }
+  };
+
+  const deleteFolder = async (folderId: string) => {
+    const res = await fetch("/api/folders", {
+      method: "DELETE",
+      headers: { "Content-Type": "application/json", ...(getCsrfToken() ? { "X-CSRF-Token": getCsrfToken()! } : {}) },
+      body: JSON.stringify({ id: folderId }),
+    });
+    if (res.ok) {
+      setFolders(prev => prev.filter(f => f.id !== folderId));
+      if (activeFolder === folderId) setActiveFolder(null);
+      toast({ title: "Folder deleted" });
+    }
+  };
+
+  const moveToFolder = async (uploadId: string, folderId: string | null) => {
+    await fetch(`/api/uploads/${uploadId}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json", ...(getCsrfToken() ? { "X-CSRF-Token": getCsrfToken()! } : {}) },
+      body: JSON.stringify({ folder_id: folderId }),
+    });
+    revalidator.revalidate();
+    toast({ title: folderId ? "Moved to folder" : "Removed from folder" });
+  };
 
   const handleDrop = useCallback((e: React.DragEvent) => {
     e.preventDefault(); setDragActive(false);
@@ -274,6 +365,48 @@ export default function UploadsPage() {
         </div>
       </div>
 
+      {/* Folders */}
+      {folders.length > 0 && (
+        <div className="flex items-center gap-3 overflow-x-auto pb-1">
+          <button onClick={() => setActiveFolder(null)}
+            className={cn("flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-medium transition-all shrink-0",
+              !activeFolder ? "bg-primary/20 text-primary border border-primary/30" : "bg-white/5 text-gray-400 border border-white/5 hover:bg-white/10")}>
+            <Icon name="folder_open" className="text-lg" /> All Files
+          </button>
+          {folders.map((f: any) => (
+            <div key={f.id} className="flex items-center gap-1 shrink-0">
+              <button onClick={() => setActiveFolder(f.id)}
+                className={cn("flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-medium transition-all",
+                  activeFolder === f.id ? "bg-primary/20 text-primary border border-primary/30" : "bg-white/5 text-gray-400 border border-white/5 hover:bg-white/10")}>
+                <Icon name="folder" className="text-lg" /> {f.name}
+                <span className="text-xs opacity-60">({uploads.filter((u: any) => u.folder_id === f.id).length})</span>
+              </button>
+              <button onClick={() => deleteFolder(f.id)} className="p-1 text-gray-600 hover:text-red-400 rounded transition-colors" title="Delete folder">
+                <Icon name="close" className="text-sm" />
+              </button>
+            </div>
+          ))}
+          <div className="flex items-center gap-1 shrink-0">
+            <input value={newFolderName} onChange={(e) => setNewFolderName(e.target.value)} placeholder="New folder"
+              onKeyDown={(e) => e.key === "Enter" && createFolder()}
+              className="px-3 py-2 border border-white/10 rounded-lg bg-[#0a0a0a] text-gray-300 placeholder-gray-600 focus:outline-none focus:ring-1 focus:ring-primary text-sm w-32" />
+            <button onClick={createFolder} className="p-2 text-gray-400 hover:text-primary hover:bg-white/5 rounded-lg transition-colors">
+              <Icon name="create_new_folder" className="text-lg" />
+            </button>
+          </div>
+        </div>
+      )}
+      {folders.length === 0 && (
+        <div className="flex items-center gap-2">
+          <input value={newFolderName} onChange={(e) => setNewFolderName(e.target.value)} placeholder="Create a folder..."
+            onKeyDown={(e) => e.key === "Enter" && createFolder()}
+            className="px-3 py-2 border border-white/10 rounded-lg bg-[#0a0a0a] text-gray-300 placeholder-gray-600 focus:outline-none focus:ring-1 focus:ring-primary text-sm w-48" />
+          <button onClick={createFolder} className="p-2 text-gray-400 hover:text-primary hover:bg-white/5 rounded-lg transition-colors">
+            <Icon name="create_new_folder" className="text-lg" />
+          </button>
+        </div>
+      )}
+
       {/* Recent Files header */}
       <div className="flex items-center justify-between glass-card rounded-2xl p-1">
         <div className="flex items-center gap-3 px-5 py-3">
@@ -348,6 +481,14 @@ export default function UploadsPage() {
                         <Icon name={upload.is_public ? "visibility_off" : "visibility"} className="text-lg" />
                         {upload.is_public ? "Make private" : "Make public"}
                       </DropdownMenuItem>
+                      <DropdownMenuItem onClick={() => { setSettingsFile(upload); setFilePassword(""); setFileExpiry(""); }} className="flex items-center gap-3 px-3 py-2 text-sm text-gray-300 hover:text-white hover:bg-white/5 rounded-lg">
+                        <Icon name="settings" className="text-lg" /> Settings
+                      </DropdownMenuItem>
+                      {folders.length > 0 && (
+                        <DropdownMenuItem onClick={() => moveToFolder(upload.id, upload.folder_id ? null : folders[0].id)} className="flex items-center gap-3 px-3 py-2 text-sm text-gray-300 hover:text-white hover:bg-white/5 rounded-lg">
+                          <Icon name="folder" className="text-lg" /> {upload.folder_id ? "Remove from folder" : "Move to folder"}
+                        </DropdownMenuItem>
+                      )}
                       <div className="h-px bg-white/5 my-1" />
                       <DropdownMenuItem onClick={() => deleteUpload(upload)} className="flex items-center gap-3 px-3 py-2 text-sm text-red-400 hover:text-red-300 hover:bg-red-500/10 rounded-lg">
                         <Icon name="delete" className="text-lg" /> Delete
@@ -456,6 +597,9 @@ export default function UploadsPage() {
                           <Icon name={upload.is_public ? "visibility_off" : "visibility"} className="text-lg" />
                           {upload.is_public ? "Make private" : "Make public"}
                         </DropdownMenuItem>
+                        <DropdownMenuItem onClick={() => { setSettingsFile(upload); setFilePassword(""); setFileExpiry(""); }} className="flex items-center gap-3 px-3 py-2 text-sm text-gray-300 hover:text-white hover:bg-white/5 rounded-lg">
+                          <Icon name="settings" className="text-lg" /> Settings
+                        </DropdownMenuItem>
                         <div className="h-px bg-white/5 my-1" />
                         <DropdownMenuItem onClick={() => deleteUpload(upload)} className="flex items-center gap-3 px-3 py-2 text-sm text-red-400 hover:text-red-300 hover:bg-red-500/10 rounded-lg">
                           <Icon name="delete" className="text-lg" /> Delete
@@ -504,6 +648,48 @@ export default function UploadsPage() {
               </div>
             </>
           )}
+        </DialogContent>
+      </Dialog>
+
+      {/* File settings dialog (expiration, password, folder) */}
+      <Dialog open={!!settingsFile} onOpenChange={() => setSettingsFile(null)}>
+        <DialogContent className="bg-[#141414] border-white/10 max-w-md">
+          <DialogHeader><DialogTitle className="text-white truncate">{settingsFile?.original_name}</DialogTitle></DialogHeader>
+          <div className="space-y-5">
+            <div className="space-y-2">
+              <label className="text-sm font-medium text-gray-400 flex items-center gap-2"><Icon name="timer" className="text-lg" /> Expiration</label>
+              <select value={fileExpiry} onChange={(e) => setFileExpiry(e.target.value)}
+                className="block w-full px-4 py-2.5 border border-white/10 rounded-lg bg-[#0a0a0a] text-gray-300 focus:outline-none focus:ring-1 focus:ring-primary text-sm">
+                <option value="">No change</option>
+                <option value="1">1 hour</option>
+                <option value="24">24 hours</option>
+                <option value="168">7 days</option>
+                <option value="720">30 days</option>
+                <option value="0">Remove expiration</option>
+              </select>
+              {settingsFile?.expires_at && <p className="text-xs text-yellow-500">Currently expires: {new Date(settingsFile.expires_at).toLocaleString()}</p>}
+            </div>
+            <div className="space-y-2">
+              <label className="text-sm font-medium text-gray-400 flex items-center gap-2"><Icon name="lock" className="text-lg" /> Password Protection</label>
+              <input type="password" value={filePassword} onChange={(e) => setFilePassword(e.target.value)} placeholder={settingsFile?.password_hash ? "Change password (leave empty to keep)" : "Set password (optional)"}
+                className="block w-full px-4 py-2.5 border border-white/10 rounded-lg bg-[#0a0a0a] text-gray-300 placeholder-gray-600 focus:outline-none focus:ring-1 focus:ring-primary text-sm" />
+              {settingsFile?.password_hash && <p className="text-xs text-primary">This file is password protected</p>}
+            </div>
+            {folders.length > 0 && (
+              <div className="space-y-2">
+                <label className="text-sm font-medium text-gray-400 flex items-center gap-2"><Icon name="folder" className="text-lg" /> Folder</label>
+                <select value={settingsFile?.folder_id || ""} onChange={(e) => moveToFolder(settingsFile.id, e.target.value || null)}
+                  className="block w-full px-4 py-2.5 border border-white/10 rounded-lg bg-[#0a0a0a] text-gray-300 focus:outline-none focus:ring-1 focus:ring-primary text-sm">
+                  <option value="">No folder</option>
+                  {folders.map((f: any) => <option key={f.id} value={f.id}>{f.name}</option>)}
+                </select>
+              </div>
+            )}
+          </div>
+          <div className="flex justify-end gap-2 mt-2">
+            <button onClick={() => setSettingsFile(null)} className="px-4 py-2 text-sm text-gray-400 border border-white/10 rounded-lg hover:bg-white/5 transition-colors">Cancel</button>
+            <button onClick={saveFileSettings} className="px-4 py-2 text-sm text-white bg-primary hover:bg-[var(--primary-hover)] rounded-lg shadow-glow-primary transition-all">Save</button>
+          </div>
         </DialogContent>
       </Dialog>
     </div>

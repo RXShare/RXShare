@@ -2,6 +2,7 @@ import { getSession } from "~/.server/session";
 import { queryOne, execute } from "~/.server/db";
 import { rateLimit } from "~/.server/rate-limit";
 import { validateCsrf } from "~/.server/csrf";
+import bcrypt from "bcryptjs";
 
 export async function action({ request, params }: { request: Request; params: { id: string } }) {
   if (request.method !== "PATCH") return new Response("Method not allowed", { status: 405 });
@@ -21,8 +22,20 @@ export async function action({ request, params }: { request: Request; params: { 
   if (!upload) return Response.json({ error: "Not found" }, { status: 404 });
 
   const body = await request.json();
+  const now = new Date().toISOString();
+
   if (body.is_public !== undefined) {
-    execute("UPDATE uploads SET is_public = ?, updated_at = ? WHERE id = ?", [body.is_public ? 1 : 0, new Date().toISOString(), params.id]);
+    execute("UPDATE uploads SET is_public = ?, updated_at = ? WHERE id = ?", [body.is_public ? 1 : 0, now, params.id]);
+  }
+  if (body.expires_at !== undefined) {
+    execute("UPDATE uploads SET expires_at = ?, updated_at = ? WHERE id = ?", [body.expires_at, now, params.id]);
+  }
+  if (body.password !== undefined) {
+    const hash = body.password ? await bcrypt.hash(body.password, 10) : null;
+    execute("UPDATE uploads SET password_hash = ?, updated_at = ? WHERE id = ?", [hash, now, params.id]);
+  }
+  if (body.folder_id !== undefined) {
+    execute("UPDATE uploads SET folder_id = ?, updated_at = ? WHERE id = ?", [body.folder_id, now, params.id]);
   }
   return Response.json({ ok: true });
 }

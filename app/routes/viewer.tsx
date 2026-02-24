@@ -9,10 +9,30 @@ import { Icon } from "~/components/Icon";
 export async function loader({ params, request }: { params: { fileName: string }; request: Request }) {
   const upload = queryOne<any>("SELECT u.*, us.embed_title, us.embed_description, us.embed_color, us.custom_path, usr.username FROM uploads u LEFT JOIN user_settings us ON u.user_id = us.user_id LEFT JOIN users usr ON u.user_id = usr.id WHERE u.file_name = ?", [params.fileName]);
   if (!upload) throw new Response("Not Found", { status: 404 });
-  if (!upload.is_public) {
-    const session = await getSession(request);
-    if (!session || session.user.id !== upload.user_id) {
-      throw new Response("Not Found", { status: 404 });
+
+  const session = await getSession(request);
+  const isOwner = session && session.user.id === upload.user_id;
+
+  // Check expiration (owner can still access)
+  if (upload.expires_at && !isOwner) {
+    if (new Date(upload.expires_at) < new Date()) {
+      throw new Response("This link has expired", { status: 410 });
+    }
+  }
+
+  if (!upload.is_public && !isOwner) {
+    throw new Response("Not Found", { status: 404 });
+  }
+
+  // Check password protection (owner bypasses)
+  const needsPassword = !!upload.password_hash && !isOwner;
+  if (needsPassword) {
+    const cookieHeader = request.headers.get("Cookie") || "";
+    const pwCookie = `pw_${upload.id}`;
+    if (!cookieHeader.includes(pwCookie)) {
+      // Return minimal data for password gate
+      const sys = queryOne<any>("SELECT primary_color, background_pattern FROM system_settings LIMIT 1");
+      return { passwordRequired: true, fileName: params.fileName, originalName: upload.original_name, backgroundPattern: sys?.background_pattern || "grid" };
     }
   }
 
@@ -68,7 +88,14 @@ export function meta({ data }: { data: any }) {
 }
 
 export default function Viewer() {
-  const { upload, backgroundPattern } = useLoaderData<typeof loader>();
+  const data = useLoaderData<typeof loader>() as any;
+
+  // Password gate
+  if (data.passwordRequired) {
+    return <PasswordGate fileName={data.fileName} originalName={data.originalName} backgroundPattern={data.backgroundPattern} />;
+  }
+
+  const { upload, backgroundPattern } = data;
   const category = getMimeCategory(upload.mime_type);
   const fileUrl = `/api/files/${upload.file_path}`;
   const patClass = `bg-pattern-${backgroundPattern}`;
@@ -156,4 +183,50 @@ function TextViewer({ url }: { url: string }) {
     return () => { cancelled = true; };
   }, [url]);
   return <pre className="p-4 text-sm overflow-auto max-h-[calc(100vh-8rem)] whitespace-pre-wrap font-mono text-gray-300">{content || "Loading..."}</pre>;
+}
+
+function PasswordGate({ fileName, originalName, backgroundPattern }: { fileName: string; originalName: string; backgroundPattern: string }) {
+  const [password, setPassword] = useState("");
+  const [error, setError] = useState("");
+  const [loading, setLoading] = useState(false);
+  const patClass = `bg-pattern-${backgroundPattern}`;
+
+  const submit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setLoading(true); setError("");
+    try {
+      const res = await fetch("/api/verify-password", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ fileName, password }),
+      });
+      if (!res.ok) { const d = await res.json(); setError(d.error || "Wrong password"); return; }
+      window.location.reload();
+    } catch { setError("Failed to verify"); }
+    finally { setLoading(false); }
+  };
+
+  return (
+    <div className="min-h-screen flex items-center justify-center p-4 relative">
+      <div className={`fixed inset-0 ${patClass} opacity-40 pointer-events-none`} />
+      <div className="glass-card rounded-2xl p-8 max-w-sm w-full space-y-6 relative z-10 shadow-glow-card">
+        <div className="text-center">
+          <div className="w-16 h-16 rounded-full bg-primary/20 flex items-center justify-center mx-auto mb-4">
+            <Icon name="lock" className="text-3xl text-primary" />
+          </div>
+          <h1 className="text-xl font-bold text-white">Password Protected</h1>
+          <p className="text-sm text-gray-500 mt-1 truncate">{originalName}</p>
+        </div>
+        <form onSubmit={submit} className="space-y-4">
+          <input type="password" value={password} onChange={(e) => setPassword(e.target.value)} placeholder="Enter password"
+            className="block w-full px-4 py-3 border border-white/10 rounded-lg bg-[#0a0a0a] text-gray-300 placeholder-gray-600 focus:outline-none focus:ring-1 focus:ring-primary focus:border-primary text-sm" autoFocus />
+          {error && <p className="text-sm text-red-400">{error}</p>}
+          <button type="submit" disabled={loading || !password}
+            className="w-full bg-primary hover:bg-[var(--primary-hover)] text-white py-3 rounded-lg font-bold shadow-glow-primary transition-all disabled:opacity-50">
+            {loading ? "Verifying..." : "Unlock"}
+          </button>
+        </form>
+      </div>
+    </div>
+  );
 }

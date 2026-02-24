@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useLoaderData, useOutletContext, useRevalidator } from "react-router";
 import { getSession } from "~/.server/session";
 import { isAdmin } from "~/.server/auth";
@@ -35,6 +35,9 @@ export default function AdminPage() {
     { id: "users", label: "Users", icon: "manage_accounts" },
     { id: "settings", label: "General", icon: "settings" },
     { id: "design", label: "Design", icon: "palette" },
+    { id: "audit", label: "Audit Log", icon: "history" },
+    { id: "webhooks", label: "Webhooks", icon: "webhook" },
+    { id: "invites", label: "Invites", icon: "mail" },
   ];
 
   return (
@@ -91,6 +94,9 @@ export default function AdminPage() {
       {activeTab === "users" && <UsersTab users={users} allUploads={allUploads} currentUserId={currentUserId} toast={toast} revalidator={revalidator} />}
       {activeTab === "settings" && <SettingsTab systemSettings={systemSettings} toast={toast} revalidator={revalidator} />}
       {activeTab === "design" && <DesignTab systemSettings={systemSettings} toast={toast} revalidator={revalidator} />}
+      {activeTab === "audit" && <AuditTab toast={toast} />}
+      {activeTab === "webhooks" && <WebhooksTab toast={toast} />}
+      {activeTab === "invites" && <InvitesTab toast={toast} systemSettings={systemSettings} />}
     </div>
   );
 }
@@ -520,6 +526,216 @@ function DesignTab({ systemSettings, toast, revalidator }: any) {
         <button onClick={save} className="bg-primary hover:bg-[var(--primary-hover)] text-white px-8 py-3.5 rounded-xl font-bold shadow-glow-primary transition-all hover:scale-105 flex items-center gap-2">Save Configuration</button>
         <button className="text-gray-400 hover:text-white px-6 py-3.5 rounded-xl font-medium border border-transparent hover:border-white/10 transition-all">Reset to Defaults</button>
       </div>
+    </div>
+  );
+}
+
+function AuditTab({ toast }: any) {
+  const [logs, setLogs] = useState<any[]>([]);
+  const [page, setPage] = useState(1);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    setLoading(true);
+    fetch(`/api/admin/audit?page=${page}`).then(r => r.json()).then(d => { setLogs(d.logs || []); setLoading(false); }).catch(() => setLoading(false));
+  }, [page]);
+
+  const actionColors: Record<string, string> = {
+    upload: "text-green-400", delete: "text-red-400", login: "text-blue-400",
+    "user.create": "text-primary", "user.delete": "text-red-400",
+    "folder.create": "text-yellow-400", "webhook.create": "text-purple-400",
+    "invite.create": "text-pink-400", "invite.use": "text-emerald-400",
+  };
+
+  return (
+    <div className="mt-6 space-y-6">
+      <div className="bg-[#141414] border border-white/5 rounded-2xl shadow-glow-card overflow-hidden">
+        <table className="w-full text-left">
+          <thead>
+            <tr className="bg-white/5 border-b border-white/10 text-xs font-semibold uppercase text-gray-400 tracking-wider">
+              <th className="px-6 py-4">Action</th>
+              <th className="px-6 py-4">User</th>
+              <th className="px-6 py-4">Details</th>
+              <th className="px-6 py-4">IP</th>
+              <th className="px-6 py-4">Time</th>
+            </tr>
+          </thead>
+          <tbody className="divide-y divide-white/5">
+            {loading ? (
+              <tr><td colSpan={5} className="px-6 py-8 text-center text-gray-500">Loading...</td></tr>
+            ) : logs.length === 0 ? (
+              <tr><td colSpan={5} className="px-6 py-8 text-center text-gray-500">No audit logs yet</td></tr>
+            ) : logs.map((log: any) => (
+              <tr key={log.id} className="hover:bg-white/[0.03] transition-colors">
+                <td className="px-6 py-3"><span className={cn("text-sm font-medium", actionColors[log.action] || "text-gray-300")}>{log.action}</span></td>
+                <td className="px-6 py-3 text-sm text-gray-300">{log.username || "system"}</td>
+                <td className="px-6 py-3 text-sm text-gray-500 truncate max-w-[200px]">{log.details || "-"}</td>
+                <td className="px-6 py-3 text-xs text-gray-600 font-mono">{log.ip_address || "-"}</td>
+                <td className="px-6 py-3 text-xs text-gray-500">{log.created_at ? new Date(log.created_at).toLocaleString() : "-"}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+        <div className="px-6 py-4 border-t border-white/5 flex items-center justify-between bg-white/[0.02]">
+          <button onClick={() => setPage(p => Math.max(1, p - 1))} disabled={page === 1}
+            className="px-3 py-1.5 text-xs text-gray-400 border border-white/10 rounded-lg hover:bg-white/5 disabled:opacity-30">Previous</button>
+          <span className="text-xs text-gray-500">Page {page}</span>
+          <button onClick={() => setPage(p => p + 1)} disabled={logs.length < 50}
+            className="px-3 py-1.5 text-xs text-gray-400 border border-white/10 rounded-lg hover:bg-white/5 disabled:opacity-30">Next</button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function WebhooksTab({ toast }: any) {
+  const [webhooks, setWebhooks] = useState<any[]>([]);
+  const [name, setName] = useState("");
+  const [url, setUrl] = useState("");
+  const [events, setEvents] = useState("upload,delete");
+
+  useEffect(() => {
+    fetch("/api/admin/webhooks").then(r => r.json()).then(d => setWebhooks(d.webhooks || [])).catch(() => {});
+  }, []);
+
+  const create = async () => {
+    if (!name.trim() || !url.trim()) { toast({ title: "Name and URL required", variant: "destructive" }); return; }
+    const res = await fetch("/api/admin/webhooks", {
+      method: "POST",
+      headers: { "Content-Type": "application/json", ...(getCsrfToken() ? { "X-CSRF-Token": getCsrfToken()! } : {}) },
+      body: JSON.stringify({ name: name.trim(), url: url.trim(), events }),
+    });
+    const d = await res.json();
+    if (res.ok) { setWebhooks(prev => [{ ...d, name: name.trim(), url: url.trim(), events, is_active: 1 }, ...prev]); setName(""); setUrl(""); toast({ title: "Webhook created" }); }
+  };
+
+  const remove = async (id: string) => {
+    await fetch("/api/admin/webhooks", {
+      method: "DELETE",
+      headers: { "Content-Type": "application/json", ...(getCsrfToken() ? { "X-CSRF-Token": getCsrfToken()! } : {}) },
+      body: JSON.stringify({ id }),
+    });
+    setWebhooks(prev => prev.filter(w => w.id !== id));
+    toast({ title: "Webhook deleted" });
+  };
+
+  const toggle = async (id: string, active: boolean) => {
+    await fetch("/api/admin/webhooks", {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json", ...(getCsrfToken() ? { "X-CSRF-Token": getCsrfToken()! } : {}) },
+      body: JSON.stringify({ id, is_active: active ? 1 : 0 }),
+    });
+    setWebhooks(prev => prev.map(w => w.id === id ? { ...w, is_active: active ? 1 : 0 } : w));
+  };
+
+  const inputCls = "block w-full px-4 py-2.5 border border-white/10 rounded-lg bg-[#0a0a0a] text-gray-300 placeholder-gray-600 focus:outline-none focus:ring-1 focus:ring-primary text-sm";
+
+  return (
+    <div className="mt-6 max-w-xl space-y-6">
+      <section className="bg-[#141414] border border-white/5 rounded-2xl p-8 shadow-glow-card space-y-6">
+        <h3 className="text-xl font-bold text-white flex items-center gap-2"><span className="w-1 h-6 bg-primary rounded-full" /> Create Webhook</h3>
+        <div className="space-y-4">
+          <div className="space-y-2"><label className="text-sm font-medium text-gray-400">Name</label><input value={name} onChange={(e) => setName(e.target.value)} className={inputCls} placeholder="Discord notifications" /></div>
+          <div className="space-y-2"><label className="text-sm font-medium text-gray-400">URL</label><input value={url} onChange={(e) => setUrl(e.target.value)} className={inputCls} placeholder="https://discord.com/api/webhooks/..." /></div>
+          <div className="space-y-2"><label className="text-sm font-medium text-gray-400">Events (comma-separated)</label><input value={events} onChange={(e) => setEvents(e.target.value)} className={inputCls} placeholder="upload,delete,login,signup" /><p className="text-xs text-gray-600">Available: upload, delete, login, signup, user.create, user.delete, * (all)</p></div>
+          <button onClick={create} className="bg-primary hover:bg-[var(--primary-hover)] text-white px-6 py-2.5 rounded-xl font-bold shadow-glow-primary transition-all">Create Webhook</button>
+        </div>
+      </section>
+      {webhooks.length > 0 && (
+        <section className="space-y-3">
+          {webhooks.map((w: any) => (
+            <div key={w.id} className="bg-[#141414] border border-white/5 rounded-xl p-4 flex items-center justify-between">
+              <div>
+                <p className="text-sm font-medium text-white">{w.name}</p>
+                <p className="text-xs text-gray-500 truncate max-w-[300px]">{w.url}</p>
+                <p className="text-xs text-gray-600 mt-1">Events: {w.events}</p>
+              </div>
+              <div className="flex items-center gap-2">
+                <Switch checked={w.is_active === 1} onCheckedChange={(v) => toggle(w.id, v)} />
+                <button onClick={() => remove(w.id)} className="p-2 text-gray-500 hover:text-red-400 hover:bg-red-500/10 rounded-lg transition-all"><Icon name="delete" /></button>
+              </div>
+            </div>
+          ))}
+        </section>
+      )}
+    </div>
+  );
+}
+
+function InvitesTab({ toast, systemSettings }: any) {
+  const [invites, setInvites] = useState<any[]>([]);
+  const [maxUses, setMaxUses] = useState("1");
+  const [expiresHours, setExpiresHours] = useState("72");
+
+  useEffect(() => {
+    fetch("/api/admin/invites").then(r => r.json()).then(d => setInvites(d.invites || [])).catch(() => {});
+  }, []);
+
+  const create = async () => {
+    const res = await fetch("/api/admin/invites", {
+      method: "POST",
+      headers: { "Content-Type": "application/json", ...(getCsrfToken() ? { "X-CSRF-Token": getCsrfToken()! } : {}) },
+      body: JSON.stringify({ max_uses: parseInt(maxUses) || 1, expires_hours: parseInt(expiresHours) || null }),
+    });
+    const d = await res.json();
+    if (res.ok) {
+      const base = systemSettings?.base_url || window.location.origin;
+      const link = `${base}/auth/sign-up?invite=${d.code}`;
+      navigator.clipboard.writeText(link);
+      setInvites(prev => [{ ...d, max_uses: parseInt(maxUses) || 1, uses: 0, created_at: new Date().toISOString() }, ...prev]);
+      toast({ title: "Invite created & link copied!" });
+    }
+  };
+
+  const remove = async (id: string) => {
+    await fetch("/api/admin/invites", {
+      method: "DELETE",
+      headers: { "Content-Type": "application/json", ...(getCsrfToken() ? { "X-CSRF-Token": getCsrfToken()! } : {}) },
+      body: JSON.stringify({ id }),
+    });
+    setInvites(prev => prev.filter(i => i.id !== id));
+    toast({ title: "Invite deleted" });
+  };
+
+  const inputCls = "block w-full px-4 py-2.5 border border-white/10 rounded-lg bg-[#0a0a0a] text-gray-300 placeholder-gray-600 focus:outline-none focus:ring-1 focus:ring-primary text-sm";
+
+  return (
+    <div className="mt-6 max-w-xl space-y-6">
+      <section className="bg-[#141414] border border-white/5 rounded-2xl p-8 shadow-glow-card space-y-6">
+        <h3 className="text-xl font-bold text-white flex items-center gap-2"><span className="w-1 h-6 bg-primary rounded-full" /> Create Invite</h3>
+        <p className="text-sm text-gray-500 -mt-4">Invite links allow users to register even when registration is disabled.</p>
+        <div className="grid grid-cols-2 gap-4">
+          <div className="space-y-2"><label className="text-sm font-medium text-gray-400">Max Uses</label><input type="number" value={maxUses} onChange={(e) => setMaxUses(e.target.value)} className={inputCls} /></div>
+          <div className="space-y-2"><label className="text-sm font-medium text-gray-400">Expires (hours)</label><input type="number" value={expiresHours} onChange={(e) => setExpiresHours(e.target.value)} className={inputCls} placeholder="Leave empty for no expiry" /></div>
+        </div>
+        <button onClick={create} className="bg-primary hover:bg-[var(--primary-hover)] text-white px-6 py-2.5 rounded-xl font-bold shadow-glow-primary transition-all flex items-center gap-2">
+          <Icon name="link" className="text-lg" /> Generate Invite Link
+        </button>
+      </section>
+      {invites.length > 0 && (
+        <section className="space-y-3">
+          {invites.map((inv: any) => {
+            const expired = inv.expires_at && new Date(inv.expires_at) < new Date();
+            const full = inv.uses >= inv.max_uses;
+            return (
+              <div key={inv.id} className={cn("bg-[#141414] border border-white/5 rounded-xl p-4 flex items-center justify-between", (expired || full) && "opacity-50")}>
+                <div>
+                  <p className="text-sm font-mono text-white">{inv.code}</p>
+                  <p className="text-xs text-gray-500">{inv.uses}/{inv.max_uses} uses{inv.created_by_name && ` • by ${inv.created_by_name}`}{inv.used_by_name && ` • used by ${inv.used_by_name}`}</p>
+                  {expired && <p className="text-xs text-red-400">Expired</p>}
+                  {full && !expired && <p className="text-xs text-yellow-400">Fully used</p>}
+                  {inv.expires_at && !expired && <p className="text-xs text-gray-600">Expires: {new Date(inv.expires_at).toLocaleString()}</p>}
+                </div>
+                <div className="flex items-center gap-2">
+                  <button onClick={() => { const base = systemSettings?.base_url || window.location.origin; navigator.clipboard.writeText(`${base}/auth/sign-up?invite=${inv.code}`); toast({ title: "Link copied!" }); }}
+                    className="p-2 text-gray-500 hover:text-white hover:bg-white/10 rounded-lg transition-all"><Icon name="content_copy" /></button>
+                  <button onClick={() => remove(inv.id)} className="p-2 text-gray-500 hover:text-red-400 hover:bg-red-500/10 rounded-lg transition-all"><Icon name="delete" /></button>
+                </div>
+              </div>
+            );
+          })}
+        </section>
+      )}
     </div>
   );
 }

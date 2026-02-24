@@ -1,6 +1,6 @@
 import { getDbType, type DatabaseAdapter, type DbResult } from "./adapter";
 import { createSqliteAdapter } from "./sqlite";
-import { getMigrationSQL, getIndexSQL, getMigrationUpdates } from "./migrations";
+import { getMigrationSQL, getIndexSQL, getMigrationUpdates, getNewTablesSQL } from "./migrations";
 import { existsSync, writeFileSync, mkdirSync } from "fs";
 import { join } from "path";
 
@@ -40,6 +40,7 @@ export async function initDatabase(): Promise<void> {
     for (const sql of getMigrationSQL("sqlite")) adapter.exec(sql);
     for (const sql of getIndexSQL()) { try { adapter.exec(sql); } catch {} }
     for (const sql of getMigrationUpdates()) { try { adapter.exec(sql); } catch {} }
+    for (const sql of getNewTablesSQL("sqlite")) { try { adapter.exec(sql); } catch {} }
     initialized = true;
   }
 }
@@ -52,6 +53,7 @@ export async function initDatabaseAsync(): Promise<void> {
     for (const sql of getMigrationSQL("mysql")) await mysqlExec(sql);
     for (const sql of getIndexSQL()) { try { await mysqlExec(sql); } catch {} }
     for (const sql of getMigrationUpdates()) { try { await mysqlExec(sql); } catch {} }
+    for (const sql of getNewTablesSQL("mysql")) { try { await mysqlExec(sql); } catch {} }
     initialized = true;
   } else {
     await initDatabase();
@@ -68,6 +70,7 @@ function ensureInit() {
     for (const sql of getMigrationSQL("sqlite")) adapter.exec(sql);
     for (const sql of getIndexSQL()) { try { adapter.exec(sql); } catch {} }
     for (const sql of getMigrationUpdates()) { try { adapter.exec(sql); } catch {} }
+    for (const sql of getNewTablesSQL("sqlite")) { try { adapter.exec(sql); } catch {} }
     initialized = true;
   }
 }

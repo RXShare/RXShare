@@ -3,6 +3,8 @@ import { queryOne, execute } from "~/.server/db";
 import { getStorage } from "~/.server/storage";
 import { rateLimit } from "~/.server/rate-limit";
 import { validateCsrf } from "~/.server/csrf";
+import { logAudit, getClientIp } from "~/.server/audit";
+import { dispatchWebhook } from "~/.server/webhooks";
 
 export async function action({ request, params }: { request: Request; params: { id: string } }) {
   if (request.method !== "DELETE") return new Response("Method not allowed", { status: 405 });
@@ -28,6 +30,9 @@ export async function action({ request, params }: { request: Request; params: { 
 
   execute("DELETE FROM uploads WHERE id = ?", [params.id]);
   execute("UPDATE user_settings SET disk_used = MAX(0, disk_used - ?) WHERE user_id = ?", [upload.file_size, session.user.id]);
+
+  logAudit("delete", { userId: session.user.id, targetType: "upload", targetId: params.id, details: upload.original_name, ip: getClientIp(request) });
+  dispatchWebhook("delete", { id: params.id, fileName: upload.file_name, originalName: upload.original_name });
 
   return Response.json({ ok: true });
 }

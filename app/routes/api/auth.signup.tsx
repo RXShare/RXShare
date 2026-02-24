@@ -26,7 +26,14 @@ export async function action({ request }: { request: Request }) {
   const isSetupMode = isSetup && isFirstRun();
   if (!isSetupMode) {
     const sys = queryOne<any>("SELECT allow_registration FROM system_settings LIMIT 1");
-    if (sys && !sys.allow_registration) return Response.json({ error: "Registration is disabled" }, { status: 403 });
+    if (sys && !sys.allow_registration) {
+      // Check if invite code is provided
+      if (!body.invite_code) return Response.json({ error: "Registration is disabled" }, { status: 403 });
+      const invite = queryOne<any>("SELECT * FROM invites WHERE code = ?", [body.invite_code]);
+      if (!invite) return Response.json({ error: "Invalid invite code" }, { status: 403 });
+      if (invite.expires_at && new Date(invite.expires_at) < new Date()) return Response.json({ error: "Invite expired" }, { status: 403 });
+      if (invite.uses >= invite.max_uses) return Response.json({ error: "Invite fully used" }, { status: 403 });
+    }
   }
 
   try {
@@ -51,6 +58,11 @@ export async function action({ request }: { request: Request }) {
       const token = generateToken(user.id);
       const headers = await createSessionHeaders(token);
       return Response.json({ user }, { headers });
+    }
+
+    // Mark invite as used if applicable
+    if (body.invite_code) {
+      execute("UPDATE invites SET uses = uses + 1, used_by = ? WHERE code = ?", [user.id, body.invite_code]);
     }
 
     return Response.json({ user });
