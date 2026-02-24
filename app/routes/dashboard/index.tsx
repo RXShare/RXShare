@@ -299,7 +299,7 @@ export default function UploadsPage() {
   return (
     <div className="space-y-8">
       {/* Header */}
-      <header className="flex items-center justify-between">
+      <header className="flex items-center gap-2">
         <div className="flex-1 max-w-xl">
           <div className="relative group">
             <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
@@ -307,21 +307,13 @@ export default function UploadsPage() {
             </div>
             <input className="block w-full pl-11 pr-3 py-3.5 border border-white/10 rounded-2xl leading-5 bg-[#0a0a0a]/60 backdrop-blur-xl text-gray-300 placeholder-gray-600 focus:outline-none focus:ring-1 focus:ring-primary focus:border-primary sm:text-sm transition-all shadow-[inset_0_2px_4px_rgba(0,0,0,0.3),0_0_0_1px_rgba(255,255,255,0.03)]"
               placeholder="Search files, folders, or people..." type="text" value={search} onChange={(e) => setSearch(e.target.value)} />
-            <div className="absolute inset-y-0 right-0 pr-3 flex items-center pointer-events-none">
-              <span className="text-gray-600 text-xs border border-white/10 px-1.5 py-0.5 rounded bg-white/5">⌘ K</span>
-            </div>
           </div>
         </div>
         <button onClick={() => setShowFilters(!showFilters)}
-          className={cn("ml-2 p-3 rounded-xl border transition-colors", showFilters || filterType || filterStatus ? "bg-primary/20 text-primary border-primary/30" : "bg-[#0a0a0a]/60 text-gray-500 border-white/10 hover:text-gray-300")}>
+          className={cn("p-3 rounded-xl border transition-colors", showFilters || filterType || filterStatus ? "bg-primary/20 text-primary border-primary/30" : "bg-[#0a0a0a]/60 text-gray-500 border-white/10 hover:text-gray-300")}
+          title="Advanced filters">
           <Icon name="tune" className="text-lg" />
         </button>
-        <div className="flex items-center gap-4 ml-6">
-          <button onClick={() => fileInputRef.current?.click()}
-            className="bg-primary hover:bg-[var(--primary-hover)] text-white px-5 py-2.5 rounded-lg text-sm font-bold transition-all shadow-glow-primary flex items-center gap-2 hover:scale-105">
-            <Icon name="add" className="text-lg" /> New Upload
-          </button>
-        </div>
       </header>
       {showFilters && (
         <div className="flex items-center gap-3 flex-wrap">
