@@ -8,6 +8,7 @@ export default [
   layout("routes/dashboard/layout.tsx", [
     route("dashboard", "routes/dashboard/index.tsx"),
     route("dashboard/settings", "routes/dashboard/settings.tsx"),
+    route("dashboard/short-links", "routes/dashboard/short-links.tsx"),
     route("dashboard/admin", "routes/dashboard/admin.tsx"),
   ]),
   route("v/:fileName", "routes/viewer.tsx"),

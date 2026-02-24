@@ -155,7 +155,9 @@ export default function UploadsPage() {
 
   const copyLink = (fileName: string) => {
     const base = systemSettings?.base_url || window.location.origin;
-    navigator.clipboard.writeText(`${base}/v/${fileName}`); toast({ title: "Link copied!" });
+    const path = settings?.custom_path || `v`;
+    navigator.clipboard.writeText(`${base}/${path}/${fileName}`);
+    toast({ title: "Link copied!" });
   };
   const deleteUpload = async (upload: any) => {
     const res = await fetch(`/api/delete/${upload.id}`, { method: "DELETE", headers: { ...(getCsrfToken() ? { "X-CSRF-Token": getCsrfToken()! } : {}) } });
@@ -344,6 +346,24 @@ export default function UploadsPage() {
         </div>
       )}
       <input ref={fileInputRef} type="file" className="hidden" onChange={(e) => { const f = e.target.files?.[0]; if (f) handleUpload(f); e.target.value = ""; }} />
+
+      {/* User analytics */}
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+        {[
+          { icon: "visibility", label: "Total Views", value: uploads.reduce((a: number, u: any) => a + (u.views || 0), 0).toLocaleString(), color: "text-primary" },
+          { icon: "download", label: "Total Downloads", value: uploads.reduce((a: number, u: any) => a + (u.downloads || 0), 0).toLocaleString(), color: "text-blue-500" },
+          { icon: "cloud_upload", label: "Total Files", value: String(uploads.length), color: "text-purple-500" },
+          { icon: "storage", label: "Storage Used", value: formatFileSize(totalSize), color: "text-green-500" },
+        ].map((stat) => (
+          <div key={stat.label} className="bg-[#141414]/50 backdrop-blur-md border border-white/5 p-5 rounded-2xl relative overflow-hidden group hover:border-primary/30 transition-all duration-300 shadow-glow-card">
+            <div className="absolute top-0 right-0 p-3 opacity-10 group-hover:opacity-20 transition-opacity">
+              <Icon name={stat.icon} className={cn("text-5xl", stat.color)} />
+            </div>
+            <div className="text-gray-400 text-xs font-medium mb-1">{stat.label}</div>
+            <div className="text-2xl font-bold text-white tracking-tight">{stat.value}</div>
+          </div>
+        ))}
+      </div>
 
       {/* Storage + Upload zone — exact Stitch grid */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">

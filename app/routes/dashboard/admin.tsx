@@ -26,11 +26,6 @@ export default function AdminPage() {
   const revalidator = useRevalidator();
   const [activeTab, setActiveTab] = useState("users");
 
-  const totalUsers = users.length;
-  const activeUsers = users.filter((u: any) => u.is_active !== 0).length;
-  const totalUploads = allUploads.length;
-  const totalStorage = users.reduce((acc: number, u: any) => acc + (u.disk_used || 0), 0);
-
   const tabs = [
     { id: "analytics", label: "Analytics", icon: "analytics" },
     { id: "users", label: "Users", icon: "manage_accounts" },
@@ -47,28 +42,6 @@ export default function AdminPage() {
       <div>
         <h1 className="text-3xl font-bold text-white mb-1">Admin Panel</h1>
         <p className="text-gray-500 text-sm">Manage users, settings, and design</p>
-      </div>
-
-      {/* Stats — exact Stitch */}
-      <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-6">
-        {[
-          { icon: "group", label: "Total Users", value: String(totalUsers), color: "text-primary" },
-          { icon: "wifi", label: "Active Users", value: String(activeUsers), color: "text-green-500" },
-          { icon: "cloud_upload", label: "Total Uploads", value: String(totalUploads), color: "text-blue-500" },
-          { icon: "storage", label: "Storage Used", value: formatFileSize(totalStorage), color: "text-purple-500" },
-        ].map((stat) => (
-          <div key={stat.label} className="bg-[#141414]/50 backdrop-blur-md border border-white/5 p-6 rounded-2xl relative overflow-hidden group hover:border-primary/30 transition-all duration-300 shadow-glow-card">
-            <div className="absolute top-0 right-0 p-4 opacity-10 group-hover:opacity-20 transition-opacity">
-              <Icon name={stat.icon} className={cn("text-6xl", stat.color)} />
-            </div>
-            <div className="text-gray-400 text-sm font-medium mb-2">{stat.label}</div>
-            <div className="text-3xl font-bold text-white tracking-tight">{stat.value}</div>
-            <div className="flex items-center gap-1 text-emerald-500 text-xs mt-2 font-medium">
-              <Icon name="trending_up" className="text-sm" />
-              <span>Active</span>
-            </div>
-          </div>
-        ))}
       </div>
 
       {/* Tabs */}
@@ -92,7 +65,7 @@ export default function AdminPage() {
       </div>
 
       {/* Tab content */}
-      {activeTab === "analytics" && <AnalyticsTab />}
+      {activeTab === "analytics" && <AnalyticsTab users={users} allUploads={allUploads} />}
       {activeTab === "users" && <UsersTab users={users} allUploads={allUploads} currentUserId={currentUserId} toast={toast} revalidator={revalidator} />}
       {activeTab === "settings" && <SettingsTab systemSettings={systemSettings} toast={toast} revalidator={revalidator} />}
       {activeTab === "design" && <DesignTab systemSettings={systemSettings} toast={toast} revalidator={revalidator} />}
@@ -743,7 +716,7 @@ function InvitesTab({ toast, systemSettings }: any) {
   );
 }
 
-function AnalyticsTab() {
+function AnalyticsTab({ users, allUploads }: { users: any[]; allUploads: any[] }) {
   const [data, setData] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [rc, setRc] = useState<any>(null);
@@ -821,9 +794,36 @@ function AnalyticsTab() {
     );
   };
 
+  const totalUsers = users.length;
+  const activeUsersCount = users.filter((u: any) => u.is_active !== 0).length;
+  const totalUploadsCount = allUploads.length;
+  const totalStorageUsed = users.reduce((acc: number, u: any) => acc + (u.disk_used || 0), 0);
+
   return (
     <div className="mt-6 space-y-6">
-      {/* Stat cards */}
+      {/* Admin stat cards (moved from header) */}
+      <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-6">
+        {[
+          { icon: "group", label: "Total Users", value: String(totalUsers), color: "text-primary" },
+          { icon: "wifi", label: "Active Users", value: String(activeUsersCount), color: "text-green-500" },
+          { icon: "cloud_upload", label: "Total Uploads", value: String(totalUploadsCount), color: "text-blue-500" },
+          { icon: "storage", label: "Storage Used", value: formatFileSize(totalStorageUsed), color: "text-purple-500" },
+        ].map((stat) => (
+          <div key={stat.label} className="bg-[#141414]/50 backdrop-blur-md border border-white/5 p-6 rounded-2xl relative overflow-hidden group hover:border-primary/30 transition-all duration-300 shadow-glow-card">
+            <div className="absolute top-0 right-0 p-4 opacity-10 group-hover:opacity-20 transition-opacity">
+              <Icon name={stat.icon} className={cn("text-6xl", stat.color)} />
+            </div>
+            <div className="text-gray-400 text-sm font-medium mb-2">{stat.label}</div>
+            <div className="text-3xl font-bold text-white tracking-tight">{stat.value}</div>
+            <div className="flex items-center gap-1 text-emerald-500 text-xs mt-2 font-medium">
+              <Icon name="trending_up" className="text-sm" />
+              <span>Active</span>
+            </div>
+          </div>
+        ))}
+      </div>
+
+      {/* Analytics stat cards */}
       <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-6">
         {[
           { icon: "visibility", label: "Total Views", value: (data.totalViews ?? 0).toLocaleString(), color: "text-primary" },
@@ -831,12 +831,16 @@ function AnalyticsTab() {
           { icon: "cloud_upload", label: "Uploads This Month", value: String(uploadsThisMonth), color: "text-purple-500" },
           { icon: "storage", label: "Storage This Month", value: formatFileSize(storageThisMonth), color: "text-green-500" },
         ].map((stat) => (
-          <div key={stat.label} className="bg-[#141414] border border-white/5 rounded-2xl p-8 shadow-glow-card relative overflow-hidden group hover:border-primary/30 transition-all duration-300">
+          <div key={stat.label} className="bg-[#141414]/50 backdrop-blur-md border border-white/5 p-6 rounded-2xl relative overflow-hidden group hover:border-primary/30 transition-all duration-300 shadow-glow-card">
             <div className="absolute top-0 right-0 p-4 opacity-10 group-hover:opacity-20 transition-opacity">
               <Icon name={stat.icon} className={cn("text-6xl", stat.color)} />
             </div>
             <div className="text-gray-400 text-sm font-medium mb-2">{stat.label}</div>
             <div className="text-3xl font-bold text-white tracking-tight">{stat.value}</div>
+            <div className="flex items-center gap-1 text-emerald-500 text-xs mt-2 font-medium">
+              <Icon name="trending_up" className="text-sm" />
+              <span>Active</span>
+            </div>
           </div>
         ))}
       </div>

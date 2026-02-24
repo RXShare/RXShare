@@ -9,6 +9,7 @@ const DEFAULT_LOGO = "https://cdn.rxss.click/rexsystems/logo-transparent.svg";
 interface NavItem { label: string; path: string; icon: string; adminOnly?: boolean; }
 const mainNav: NavItem[] = [
   { label: "Dashboard", path: "/dashboard", icon: "dashboard" },
+  { label: "Short Links", path: "/dashboard/short-links", icon: "link" },
   { label: "Settings", path: "/dashboard/settings", icon: "settings" },
 ];
 const systemNav: NavItem[] = [
