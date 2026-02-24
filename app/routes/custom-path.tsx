@@ -5,6 +5,7 @@ import { getBaseUrl } from "~/.server/base-url";
 import { Icon } from "~/components/Icon";
 import { cn } from "~/lib/utils";
 
+
 export async function loader({ params, request }: { params: { customPath: string; fileName?: string }; request: Request }) {
   const { customPath, fileName } = params;
 
@@ -19,9 +20,10 @@ export async function loader({ params, request }: { params: { customPath: string
   const baseUrl = getBaseUrl(request);
 
   if (fileName) {
-    const upload = queryOne<any>("SELECT * FROM uploads WHERE user_id = ? AND file_name = ? AND is_public = 1", [row.id, fileName]);
+    const upload = queryOne<any>("SELECT file_name FROM uploads WHERE user_id = ? AND file_name = ? AND is_public = 1", [row.id, fileName]);
     if (!upload) throw new Response("Not Found", { status: 404 });
-    return { type: "file" as const, upload, user: row, baseUrl, primaryColor: sys?.primary_color || null, backgroundPattern: sys?.background_pattern || "grid" };
+    // Redirect to the main viewer so the page looks identical
+    return new Response(null, { status: 302, headers: { Location: `/v/${upload.file_name}` } });
   }
 
   const uploads = query<any>("SELECT * FROM uploads WHERE user_id = ? AND is_public = 1 ORDER BY created_at DESC", [row.id]);
@@ -30,37 +32,6 @@ export async function loader({ params, request }: { params: { customPath: string
 
 export function meta({ data }: { data: any }) {
   if (!data) return [{ title: "Not Found" }];
-  if (data.type === "file" && data.upload) {
-    const { upload, user, baseUrl, primaryColor } = data;
-    const isImage = upload.mime_type?.startsWith("image/");
-    const isVideo = upload.mime_type?.startsWith("video/");
-    const fileUrl = `${baseUrl}/api/files/${upload.file_path}`;
-    const ogImage = isImage ? fileUrl : upload.preview_path ? `${baseUrl}/api/files/${upload.preview_path}` : null;
-    const safeColor = (c: string) => /^#[0-9a-fA-F]{3,8}$/.test(c) ? c : "#f97316";
-    const siteName = user.embed_site_name || "RXShare";
-    const author = user.embed_author || user.username || null;
-    return [
-      { title: user.embed_title || upload.original_name },
-      { name: "description", content: user.embed_description || `${upload.original_name} - ${formatFileSize(upload.file_size)}` },
-      { property: "og:title", content: user.embed_title || upload.original_name },
-      { property: "og:description", content: user.embed_description || formatFileSize(upload.file_size) },
-      { property: "og:site_name", content: siteName },
-      ...(author ? [{ property: "article:author", content: author }] : []),
-      ...(ogImage ? [
-        { property: "og:image", content: ogImage },
-        { property: "og:image:width", content: "1200" },
-        { property: "og:image:height", content: "630" },
-      ] : []),
-      { property: "og:type", content: isImage ? "image" : "website" },
-      { name: "twitter:card", content: isImage || isVideo ? "summary_large_image" : "summary" },
-      ...(ogImage ? [{ name: "twitter:image", content: ogImage }] : []),
-      { name: "theme-color", content: safeColor(user.embed_color || primaryColor || "#f97316") },
-      ...(isVideo ? [
-        { property: "og:video", content: fileUrl },
-        { property: "og:video:type", content: upload.mime_type },
-      ] : []),
-    ];
-  }
   if (data.type === "list" && data.user) {
     return [
       { title: `${data.user.username}'s files` },
@@ -73,47 +44,6 @@ export function meta({ data }: { data: any }) {
 export default function CustomPathViewer() {
   const data = useLoaderData<typeof loader>();
   const patClass = `bg-pattern-${data.backgroundPattern}`;
-
-  if (data.type === "file") {
-    const { upload, user } = data;
-    const fileUrl = `/api/files/${upload.file_path}`;
-    const category = getMimeCategory(upload.mime_type);
-    return (
-      <div className="min-h-screen flex flex-col items-center justify-center p-4 relative">
-        <div className={`fixed inset-0 ${patClass} opacity-40 pointer-events-none`} />
-        <div className="w-full max-w-4xl space-y-4 relative z-10 animate-in fade-in slide-in-from-bottom-4 duration-500">
-          <div className="flex items-center justify-between">
-            <div>
-              <h1 className="text-lg font-bold text-white">{upload.original_name}</h1>
-              <p className="text-sm text-gray-500">{formatFileSize(upload.file_size)} <span>•</span> {upload.views} views</p>
-            </div>
-            <div className="flex gap-2">
-              <button onClick={() => window.history.back()}
-                className="flex items-center gap-2 px-3 py-2 text-sm text-gray-300 bg-white/5 hover:bg-white/10 border border-white/10 rounded-lg transition-colors">
-                <Icon name="arrow_back" className="text-lg" /> Back
-              </button>
-              <a href={fileUrl} download={upload.original_name}
-                className="flex items-center gap-2 px-3 py-2 text-sm text-white bg-primary hover:bg-[var(--primary-hover)] rounded-lg shadow-glow-primary transition-all">
-                <Icon name="download" className="text-lg" /> Download
-              </a>
-            </div>
-          </div>
-          <div className="glass-card rounded-2xl overflow-hidden shadow-glow-card">
-            {category === "image" && <img src={fileUrl} alt="" className="max-w-full max-h-[80vh] object-contain mx-auto" />}
-            {category === "video" && <video src={fileUrl} controls className="max-w-full max-h-[80vh] mx-auto" />}
-            {category === "audio" && <div className="p-8"><audio src={fileUrl} controls className="w-full" /></div>}
-            {category === "other" && (
-              <div className="text-center py-16">
-                <Icon name="description" className="text-6xl text-gray-600 mb-4" />
-                <p className="text-gray-500">Preview not available</p>
-              </div>
-            )}
-          </div>
-        </div>
-      </div>
-    );
-  }
-
   const { uploads, user } = data;
 
   const getFileIconName = (mimeType: string) => {
