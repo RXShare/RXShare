@@ -150,6 +150,15 @@ export default function UploadsPage() {
     return () => document.removeEventListener("paste", handlePaste);
   }, [handleUpload]);
 
+  const copyLink = (fileName: string) => {
+    const base = systemSettings?.base_url || window.location.origin;
+    navigator.clipboard.writeText(`${base}/v/${fileName}`); toast({ title: "Link copied!" });
+  };
+  const deleteUpload = async (upload: any) => {
+    const res = await fetch(`/api/delete/${upload.id}`, { method: "DELETE", headers: { ...(getCsrfToken() ? { "X-CSRF-Token": getCsrfToken()! } : {}) } });
+    if (res.ok) { revalidator.revalidate(); toast({ title: "File deleted" }); }
+  };
+
   // Fetch folders
   useEffect(() => {
     fetch("/api/folders").then(r => r.json()).then(d => { if (d.folders) setFolders(d.folders); }).catch(() => {});
@@ -239,10 +248,6 @@ export default function UploadsPage() {
     const file = e.dataTransfer.files[0]; if (file) handleUpload(file);
   }, [handleUpload]);
 
-  const copyLink = (fileName: string) => {
-    const base = systemSettings?.base_url || window.location.origin;
-    navigator.clipboard.writeText(`${base}/v/${fileName}`); toast({ title: "Link copied!" });
-  };
   const createShortLink = async (uploadId: string, fileName: string) => {
     const res = await fetch("/api/short-links", {
       method: "POST",
@@ -259,10 +264,6 @@ export default function UploadsPage() {
   const toggleVisibility = async (upload: any) => {
     const res = await fetch(`/api/uploads/${upload.id}`, { method: "PATCH", headers: { "Content-Type": "application/json", ...(getCsrfToken() ? { "X-CSRF-Token": getCsrfToken()! } : {}) }, body: JSON.stringify({ is_public: upload.is_public ? 0 : 1 }) });
     if (res.ok) { revalidator.revalidate(); toast({ title: upload.is_public ? "Made private" : "Made public" }); }
-  };
-  const deleteUpload = async (upload: any) => {
-    const res = await fetch(`/api/delete/${upload.id}`, { method: "DELETE", headers: { ...(getCsrfToken() ? { "X-CSRF-Token": getCsrfToken()! } : {}) } });
-    if (res.ok) { revalidator.revalidate(); toast({ title: "File deleted" }); }
   };
 
   // Categorize storage — exact Stitch style

@@ -210,6 +210,7 @@ export default function Viewer() {
 function TextViewer({ url, fileName }: { url: string; fileName: string }) {
   const [content, setContent] = useState<string | null>(null);
   const [highlightedHtml, setHighlightedHtml] = useState<string | null>(null);
+  const codeRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -242,18 +243,19 @@ function TextViewer({ url, fileName }: { url: string; fileName: string }) {
     return () => { cancelled = true; };
   }, [content, fileName]);
 
-  if (!content) return <pre className="p-4 text-sm overflow-auto max-h-[calc(100vh-8rem)] whitespace-pre-wrap font-mono text-gray-300">Loading...</pre>;
+  // Write highlighted HTML via ref to avoid React reconciliation issues with dangerouslySetInnerHTML
+  useEffect(() => {
+    if (codeRef.current && highlightedHtml) {
+      codeRef.current.innerHTML = highlightedHtml;
+    }
+  }, [highlightedHtml]);
 
-  if (highlightedHtml) {
-    return (
-      <div
-        className="p-4 text-sm overflow-auto max-h-[calc(100vh-8rem)] [&_pre]:!bg-transparent [&_code]:!font-mono"
-        dangerouslySetInnerHTML={{ __html: highlightedHtml }}
-      />
-    );
-  }
-
-  return <pre className="p-4 text-sm overflow-auto max-h-[calc(100vh-8rem)] whitespace-pre-wrap font-mono text-gray-300">{content}</pre>;
+  // Single stable container — ref-based innerHTML avoids React reconciliation issues
+  return (
+    <div ref={codeRef} className="p-4 text-sm overflow-auto max-h-[calc(100vh-8rem)] [&_pre]:!bg-transparent [&_code]:!font-mono">
+      {!highlightedHtml && <pre className="whitespace-pre-wrap font-mono text-gray-300">{content ?? "Loading..."}</pre>}
+    </div>
+  );
 }
 
 function PasswordGate({ fileName, originalName, backgroundPattern }: { fileName: string; originalName: string; backgroundPattern: string }) {
