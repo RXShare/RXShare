@@ -63,7 +63,7 @@ export default function SettingsPage() {
       RequestMethod: "POST", RequestURL: `${base}/api/upload`,
       Headers: { Authorization: "Bearer YOUR_API_TOKEN" },
       Body: "MultipartFormData", FileFormName: "file",
-      URL: "{json:url}", ThumbnailURL: "{json:thumbnail_url}", DeletionURL: "{json:delete_url}",
+      URL: "{json:raw_url}", ThumbnailURL: "{json:thumbnail_url}", DeletionURL: "{json:delete_url}",
     };
     const blob = new Blob([JSON.stringify(config, null, 2)], { type: "application/json" });
     const a = document.createElement("a"); a.href = URL.createObjectURL(blob);
