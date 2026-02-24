@@ -174,10 +174,11 @@ export default function ShortLinksPage() {
 
       {/* Create dialog */}
       <Dialog open={showCreate} onOpenChange={setShowCreate}>
-        <DialogContent className="bg-[#141414] border-white/10 text-white !max-w-sm overflow-x-hidden">
+        <DialogContent className="bg-[#141414] border-white/10 text-white max-w-md">
           <DialogHeader>
             <DialogTitle>Create Short Link</DialogTitle>
           </DialogHeader>
+          <div className="min-w-0 w-full overflow-hidden">
           <div className="flex gap-2 mt-2">
             <button onClick={() => setCreateTab("file")}
               className={`flex-1 py-2 text-sm font-medium rounded-lg transition-colors ${createTab === "file" ? "bg-primary/20 text-primary border border-primary/30" : "bg-white/5 text-gray-400 border border-white/10 hover:bg-white/10"}`}>
@@ -192,17 +193,17 @@ export default function ShortLinksPage() {
             <div className="space-y-3 mt-2">
               <input type="text" placeholder="Search files..." value={search} onChange={(e) => setSearch(e.target.value)}
                 className="block w-full px-4 py-2.5 border border-white/10 rounded-lg bg-[#0a0a0a] text-gray-300 placeholder-gray-600 focus:outline-none focus:ring-1 focus:ring-primary text-sm" />
-              <div className="max-h-72 overflow-y-auto overflow-x-hidden space-y-0.5 rounded-lg border border-white/5 bg-[#0a0a0a]/50 p-2 min-w-0">
+              <div className="max-h-72 overflow-y-auto overflow-x-hidden space-y-0.5 rounded-lg border border-white/5 bg-[#0a0a0a]/50 p-2">
                 {filteredUploads.length === 0 ? (
                   <p className="text-sm text-gray-500 text-center py-8">No files found</p>
                 ) : (
                   filteredUploads.slice(0, 50).map((u: any) => (
                     <button key={u.id} onClick={() => createShortLink(u.id)}
-                      className="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-left hover:bg-white/5 transition-colors group">
+                      className="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-left hover:bg-white/5 transition-colors group overflow-hidden">
                       <div className="w-8 h-8 rounded-lg bg-white/5 border border-white/10 flex items-center justify-center shrink-0">
                         <Icon name="description" className="text-base text-gray-500 group-hover:text-primary transition-colors" />
                       </div>
-                      <div className="min-w-0 flex-1">
+                      <div className="min-w-0 flex-1 overflow-hidden">
                         <p className="text-sm text-gray-200 truncate group-hover:text-white transition-colors">{u.original_name}</p>
                         <p className="text-[11px] text-gray-600 truncate">{u.file_name}</p>
                       </div>
@@ -226,6 +227,7 @@ export default function ShortLinksPage() {
               </button>
             </div>
           )}
+          </div>
         </DialogContent>
       </Dialog>
     </div>
