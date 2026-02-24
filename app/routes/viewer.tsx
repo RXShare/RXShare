@@ -119,7 +119,7 @@ export default function Viewer() {
 
   useEffect(() => {
     const shareUrl = `${data.baseUrl}/v/${upload.file_name}`;
-    QRCode.toDataURL(shareUrl, { width: 280, margin: 1, color: { dark: "#ffffff", light: "#00000000" } }).then(setQrDataUrl);
+    QRCode.toDataURL(shareUrl, { width: 400, margin: 1, color: { dark: "#ffffff", light: "#00000000" } }).then(setQrDataUrl);
   }, [data.baseUrl, upload.file_name]);
 
   useEffect(() => {
@@ -169,7 +169,7 @@ export default function Viewer() {
               </button>
               {showQr && qrDataUrl && (
                 <div className="absolute right-0 top-full mt-2 p-3 glass-card rounded-xl border border-white/10 shadow-glow-card z-50">
-                  <img src={qrDataUrl} alt="QR Code" className="w-[280px] h-[280px]" />
+                  <img src={qrDataUrl} alt="QR Code" className="w-[400px] h-[400px]" />
                 </div>
               )}
             </div>
