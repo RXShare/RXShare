@@ -14,7 +14,7 @@ export async function loader({ request }: { request: Request }) {
   try {
     const exists = await storage.exists(filePath);
     if (!exists) return new Response("Not Found", { status: 404 });
-    const data = await storage.read(filePath);
+    const { stream, size } = await storage.readStream(filePath);
 
     // Guess content type from extension
     const ext = filePath.split(".").pop()?.toLowerCase() || "";
@@ -31,11 +31,11 @@ export async function loader({ request }: { request: Request }) {
     const dangerousTypes = ["text/html", "image/svg+xml", "text/javascript", "application/javascript"];
     const finalType = dangerousTypes.includes(contentType) ? "application/octet-stream" : contentType;
 
-    return new Response(data, {
+    return new Response(stream, {
       headers: {
         "Content-Type": finalType,
         "Cache-Control": "public, max-age=31536000, immutable",
-        "Content-Length": String(data.length),
+        "Content-Length": String(size),
         "Content-Security-Policy": "default-src 'none'; style-src 'unsafe-inline'",
         "X-Content-Type-Options": "nosniff",
       },

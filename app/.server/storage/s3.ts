@@ -25,6 +25,12 @@ export function createS3Storage(): StorageAdapter {
       const res = await client.send(new GetObjectCommand({ Bucket: bucket(), Key: filePath }));
       return Buffer.from(await res.Body!.transformToByteArray());
     },
+    async readStream(filePath: string) {
+      const res = await client.send(new GetObjectCommand({ Bucket: bucket(), Key: filePath }));
+      const size = res.ContentLength ?? 0;
+      const stream = res.Body!.transformToWebStream() as ReadableStream<Uint8Array>;
+      return { stream, size };
+    },
     async delete(filePath: string) {
       try { await client.send(new DeleteObjectCommand({ Bucket: bucket(), Key: filePath })); } catch {}
     },

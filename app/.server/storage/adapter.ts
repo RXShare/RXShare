@@ -1,6 +1,7 @@
 export interface StorageAdapter {
   save(filePath: string, data: Buffer): Promise<void>;
   read(filePath: string): Promise<Buffer>;
+  readStream(filePath: string): Promise<{ stream: ReadableStream<Uint8Array>; size: number }>;
   delete(filePath: string): Promise<void>;
   exists(filePath: string): Promise<boolean>;
   getUrl(filePath: string, request?: Request): string;

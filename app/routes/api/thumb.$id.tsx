@@ -7,11 +7,12 @@ export async function loader({ params }: { params: { id: string } }) {
 
   const storage = await getStorage();
   try {
-    const data = await storage.read(upload.thumbnail_path);
-    return new Response(data, {
+    const { stream, size } = await storage.readStream(upload.thumbnail_path);
+    return new Response(stream, {
       headers: {
         "Content-Type": "image/webp",
         "Cache-Control": "public, max-age=31536000, immutable",
+        "Content-Length": String(size),
         "X-Content-Type-Options": "nosniff",
       },
     });

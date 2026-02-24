@@ -1,5 +1,7 @@
 import { join, dirname, resolve, relative } from "path";
-import { readFile, writeFile, unlink, mkdir, access } from "fs/promises";
+import { readFile, writeFile, unlink, mkdir, access, stat } from "fs/promises";
+import { createReadStream } from "fs";
+import { Readable } from "stream";
 import type { StorageAdapter } from "./adapter";
 
 const uploadsDir = process.env.UPLOADS_DIR || join(process.cwd(), "data", "uploads");
@@ -23,6 +25,13 @@ export function createLocalStorage(): StorageAdapter {
     },
     async read(filePath: string) {
       return readFile(safePath(filePath));
+    },
+    async readStream(filePath: string) {
+      const full = safePath(filePath);
+      const info = await stat(full);
+      const nodeStream = createReadStream(full);
+      const stream = Readable.toWeb(nodeStream) as ReadableStream<Uint8Array>;
+      return { stream, size: info.size };
     },
     async delete(filePath: string) {
       try { await unlink(safePath(filePath)); } catch {}
