@@ -192,7 +192,7 @@ export default function ShortLinksPage() {
             <div className="space-y-3 mt-2">
               <input type="text" placeholder="Search files..." value={search} onChange={(e) => setSearch(e.target.value)}
                 className="block w-full px-4 py-2.5 border border-white/10 rounded-lg bg-[#0a0a0a] text-gray-300 placeholder-gray-600 focus:outline-none focus:ring-1 focus:ring-primary text-sm" />
-              <div className="max-h-72 overflow-y-auto space-y-0.5 rounded-lg border border-white/5 bg-[#0a0a0a]/50 p-1">
+              <div className="max-h-72 overflow-y-auto space-y-0.5 rounded-lg border border-white/5 bg-[#0a0a0a]/50 p-2">
                 {filteredUploads.length === 0 ? (
                   <p className="text-sm text-gray-500 text-center py-8">No files found</p>
                 ) : (
