@@ -137,6 +137,8 @@ export function getMigrationUpdates(): string[] {
     "ALTER TABLE user_settings ADD COLUMN embed_author TEXT",
     "ALTER TABLE user_settings ADD COLUMN embed_site_name TEXT",
     "ALTER TABLE user_settings ADD COLUMN embed_logo_url TEXT",
+    // ShareX URL mode preference (raw or viewer)
+    "ALTER TABLE user_settings ADD COLUMN sharex_url_mode TEXT DEFAULT 'raw'",
   ];
 }
 

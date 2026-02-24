@@ -25,7 +25,7 @@ export async function action({ request }: { request: Request }) {
   if (!session) return Response.json({ error: "Unauthorized" }, { status: 401 });
 
   const body = await request.json();
-  const allowed = ["embed_title", "embed_description", "embed_color", "embed_author", "embed_site_name", "embed_logo_url", "default_public", "custom_path", "sharex_folder_name"];
+  const allowed = ["embed_title", "embed_description", "embed_color", "embed_author", "embed_site_name", "embed_logo_url", "default_public", "custom_path", "sharex_folder_name", "sharex_url_mode"];
   const sets: string[] = [];
   const vals: any[] = [];
 
@@ -48,6 +48,9 @@ export async function action({ request }: { request: Request }) {
       }
       if (key === "sharex_folder_name" && typeof val === "string") {
         val = val.trim().slice(0, 50) || "ShareX";
+      }
+      if (key === "sharex_url_mode" && typeof val === "string") {
+        if (!["raw", "viewer"].includes(val)) val = "raw";
       }
       // Sanitize strings
       if (typeof val === "string") val = val.replace(/[\x00-\x08\x0B\x0C\x0E-\x1F]/g, "");

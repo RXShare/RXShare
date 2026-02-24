@@ -31,13 +31,14 @@ export default function SettingsPage() {
   const [defaultPublic, setDefaultPublic] = useState(settings?.default_public !== 0);
   const [customPath, setCustomPath] = useState(settings?.custom_path || "");
   const [sharexFolderName, setSharexFolderName] = useState(settings?.sharex_folder_name ?? "ShareX");
+  const [sharexUrlMode, setSharexUrlMode] = useState<"raw" | "viewer">(settings?.sharex_url_mode || "raw");
   const [tokenName, setTokenName] = useState("");
   const [newToken, setNewToken] = useState<string | null>(null);
 
   const saveSettings = async () => {
     const res = await fetch("/api/user/settings", {
       method: "PUT", headers: { "Content-Type": "application/json", ...(getCsrfToken() ? { "X-CSRF-Token": getCsrfToken()! } : {}) },
-      body: JSON.stringify({ embed_title: embedTitle, embed_description: embedDescription || null, embed_color: embedColor, embed_author: embedAuthor || null, embed_site_name: embedSiteName || null, embed_logo_url: embedLogoUrl || null, default_public: defaultPublic, custom_path: customPath || null, sharex_folder_name: sharexFolderName || "ShareX" }),
+      body: JSON.stringify({ embed_title: embedTitle, embed_description: embedDescription || null, embed_color: embedColor, embed_author: embedAuthor || null, embed_site_name: embedSiteName || null, embed_logo_url: embedLogoUrl || null, default_public: defaultPublic, custom_path: customPath || null, sharex_folder_name: sharexFolderName || "ShareX", sharex_url_mode: sharexUrlMode }),
     });
     if (res.ok) { revalidator.revalidate(); toast({ title: "Settings saved!" }); }
     else { const d = await res.json(); toast({ title: "Error", description: d.error, variant: "destructive" }); }
@@ -63,7 +64,7 @@ export default function SettingsPage() {
       RequestMethod: "POST", RequestURL: `${base}/api/upload`,
       Headers: { Authorization: "Bearer YOUR_API_TOKEN" },
       Body: "MultipartFormData", FileFormName: "file",
-      URL: "{json:raw_url}", ThumbnailURL: "{json:thumbnail_url}", DeletionURL: "{json:delete_url}",
+      URL: sharexUrlMode === "raw" ? "{json:raw_url}" : "{json:url}", ThumbnailURL: "{json:thumbnail_url}", DeletionURL: "{json:delete_url}",
     };
     const blob = new Blob([JSON.stringify(config, null, 2)], { type: "application/json" });
     const a = document.createElement("a"); a.href = URL.createObjectURL(blob);
@@ -116,6 +117,20 @@ export default function SettingsPage() {
           <label className="text-sm font-medium text-gray-400">ShareX Auto-Folder</label>
           <input value={sharexFolderName} onChange={(e) => setSharexFolderName(e.target.value)} className={inputCls} placeholder="ShareX" />
           <p className="text-xs text-gray-600">Uploads via API token are automatically placed in this folder</p>
+        </div>
+        <div className="space-y-2">
+          <label className="text-sm font-medium text-gray-400">ShareX Copied URL</label>
+          <div className="flex gap-2">
+            <button onClick={() => setSharexUrlMode("raw")}
+              className={`flex-1 py-2 text-sm font-medium rounded-lg transition-colors ${sharexUrlMode === "raw" ? "bg-primary/20 text-primary border border-primary/30" : "bg-white/5 text-gray-400 border border-white/10 hover:bg-white/10"}`}>
+              <Icon name="image" className="text-base mr-1.5 align-middle" /> Raw Image
+            </button>
+            <button onClick={() => setSharexUrlMode("viewer")}
+              className={`flex-1 py-2 text-sm font-medium rounded-lg transition-colors ${sharexUrlMode === "viewer" ? "bg-primary/20 text-primary border border-primary/30" : "bg-white/5 text-gray-400 border border-white/10 hover:bg-white/10"}`}>
+              <Icon name="visibility" className="text-base mr-1.5 align-middle" /> Viewer Page
+            </button>
+          </div>
+          <p className="text-xs text-gray-600">What URL ShareX copies after upload — raw file or viewer page with embed</p>
         </div>
         <button onClick={saveSettings} className="bg-primary hover:bg-[var(--primary-hover)] text-white px-6 py-2.5 rounded-xl font-bold shadow-glow-primary transition-all hover:scale-105">Save Settings</button>
       </section>
