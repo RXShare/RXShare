@@ -174,7 +174,7 @@ export default function ShortLinksPage() {
 
       {/* Create dialog */}
       <Dialog open={showCreate} onOpenChange={setShowCreate}>
-        <DialogContent className="bg-[#141414] border-white/10 text-white max-w-md">
+        <DialogContent className="bg-[#141414] border-white/10 text-white max-w-sm">
           <DialogHeader>
             <DialogTitle>Create Short Link</DialogTitle>
           </DialogHeader>
