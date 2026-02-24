@@ -25,7 +25,7 @@ export async function action({ request }: { request: Request }) {
   if (!session) return Response.json({ error: "Unauthorized" }, { status: 401 });
 
   const body = await request.json();
-  const allowed = ["embed_title", "embed_description", "embed_color", "default_public", "custom_path"];
+  const allowed = ["embed_title", "embed_description", "embed_color", "default_public", "custom_path", "sharex_folder_name"];
   const sets: string[] = [];
   const vals: any[] = [];
 
@@ -40,6 +40,9 @@ export async function action({ request }: { request: Request }) {
         const cleaned = val.toLowerCase().replace(/[^a-z0-9_-]/g, "").slice(0, 30);
         if (reserved.includes(cleaned)) return Response.json({ error: "That custom path is reserved" }, { status: 400 });
         val = cleaned || null;
+      }
+      if (key === "sharex_folder_name" && typeof val === "string") {
+        val = val.trim().slice(0, 50) || "ShareX";
       }
       // Sanitize strings
       if (typeof val === "string") val = val.replace(/[\x00-\x08\x0B\x0C\x0E-\x1F]/g, "");

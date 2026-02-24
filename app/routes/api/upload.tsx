@@ -1,7 +1,7 @@
 import { nanoid } from "nanoid";
 import crypto from "crypto";
 import { getSession } from "~/.server/session";
-import { queryOne, execute } from "~/.server/db";
+import { query, queryOne, execute } from "~/.server/db";
 import { getStorage } from "~/.server/storage";
 import { generateThumbnails } from "~/.server/thumbnails";
 import { getBaseUrl } from "~/.server/base-url";
@@ -11,11 +11,9 @@ import { validateCsrf } from "~/.server/csrf";
 import { logAudit, getClientIp } from "~/.server/audit";
 import { dispatchWebhook } from "~/.server/webhooks";
 
-async function authenticateRequest(request: Request) {
-  // Check session cookie first
+async function authenticateRequest(request: Request): Promise<{ user: any; isApiToken: boolean } | null> {
   const session = await getSession(request);
-  if (session) return session.user;
-  // Check API token
+  if (session) return { user: session.user, isApiToken: false };
   const auth = request.headers.get("Authorization");
   if (auth?.startsWith("Bearer ")) {
     const token = auth.slice(7);
@@ -23,7 +21,7 @@ async function authenticateRequest(request: Request) {
     if (result) {
       execute("UPDATE api_tokens SET last_used_at = ? WHERE user_id = ?", [new Date().toISOString(), result.user_id]);
       const user = queryOne<any>("SELECT id, email, username FROM users WHERE id = ?", [result.user_id]);
-      return user || null;
+      if (user) return { user, isApiToken: true };
     }
   }
   return null;
@@ -40,8 +38,9 @@ export async function action({ request }: { request: Request }) {
   const limited = rateLimit("upload", request, 30, 10 * 60 * 1000);
   if (limited) return limited;
 
-  const user = await authenticateRequest(request);
-  if (!user) return Response.json({ error: "Unauthorized" }, { status: 401 });
+  const auth = await authenticateRequest(request);
+  if (!auth) return Response.json({ error: "Unauthorized" }, { status: 401 });
+  const { user, isApiToken } = auth;
 
   const settings = queryOne<any>("SELECT * FROM user_settings WHERE user_id = ?", [user.id]);
   if (!settings) return Response.json({ error: "User settings not found" }, { status: 500 });
@@ -84,9 +83,22 @@ export async function action({ request }: { request: Request }) {
     previewPath = thumbs.previewPath;
   } catch {}
 
+  // Auto-assign to ShareX folder for API token uploads
+  let folderId: string | null = null;
+  if (isApiToken) {
+    const folderName = settings.sharex_folder_name || "ShareX";
+    const existing = queryOne<any>("SELECT id FROM folders WHERE user_id = ? AND name = ?", [user.id, folderName]);
+    if (existing) {
+      folderId = existing.id;
+    } else {
+      folderId = nanoid();
+      execute("INSERT INTO folders (id, user_id, name) VALUES (?, ?, ?)", [folderId, user.id, folderName]);
+    }
+  }
+
   execute(
-    "INSERT INTO uploads (id, user_id, file_name, original_name, mime_type, file_size, file_path, thumbnail_path, preview_path, is_public, file_hash, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
-    [uploadId, user.id, fileName, file.name, file.type || "application/octet-stream", file.size, filePath, thumbnailPath, previewPath, settings.default_public ? 1 : 0, fileHash, now, now]
+    "INSERT INTO uploads (id, user_id, file_name, original_name, mime_type, file_size, file_path, thumbnail_path, preview_path, is_public, file_hash, folder_id, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+    [uploadId, user.id, fileName, file.name, file.type || "application/octet-stream", file.size, filePath, thumbnailPath, previewPath, settings.default_public ? 1 : 0, fileHash, folderId, now, now]
   );
 
   execute("UPDATE user_settings SET disk_used = disk_used + ? WHERE user_id = ?", [file.size, user.id]);

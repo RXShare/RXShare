@@ -129,6 +129,8 @@ export function getMigrationUpdates(): string[] {
     "ALTER TABLE uploads ADD COLUMN file_hash TEXT",
     // File notes/description
     "ALTER TABLE uploads ADD COLUMN description TEXT",
+    // ShareX auto-folder name
+    "ALTER TABLE user_settings ADD COLUMN sharex_folder_name TEXT DEFAULT 'ShareX'",
   ];
 }
 

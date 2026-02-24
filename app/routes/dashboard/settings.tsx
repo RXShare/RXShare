@@ -27,13 +27,14 @@ export default function SettingsPage() {
   const [embedColor, setEmbedColor] = useState(settings?.embed_color || "#f97316");
   const [defaultPublic, setDefaultPublic] = useState(settings?.default_public !== 0);
   const [customPath, setCustomPath] = useState(settings?.custom_path || "");
+  const [sharexFolderName, setSharexFolderName] = useState(settings?.sharex_folder_name ?? "ShareX");
   const [tokenName, setTokenName] = useState("");
   const [newToken, setNewToken] = useState<string | null>(null);
 
   const saveSettings = async () => {
     const res = await fetch("/api/user/settings", {
       method: "PUT", headers: { "Content-Type": "application/json", ...(getCsrfToken() ? { "X-CSRF-Token": getCsrfToken()! } : {}) },
-      body: JSON.stringify({ embed_title: embedTitle, embed_description: embedDescription || null, embed_color: embedColor, default_public: defaultPublic, custom_path: customPath || null }),
+      body: JSON.stringify({ embed_title: embedTitle, embed_description: embedDescription || null, embed_color: embedColor, default_public: defaultPublic, custom_path: customPath || null, sharex_folder_name: sharexFolderName || "ShareX" }),
     });
     if (res.ok) { revalidator.revalidate(); toast({ title: "Settings saved!" }); }
     else { const d = await res.json(); toast({ title: "Error", description: d.error, variant: "destructive" }); }
@@ -104,6 +105,11 @@ export default function SettingsPage() {
           <label className="text-sm font-medium text-gray-400">Custom URL Path (optional)</label>
           <input value={customPath} onChange={(e) => setCustomPath(e.target.value.toLowerCase())} className={inputCls} placeholder="my-files" />
           <p className="text-xs text-gray-600">Use instead of your username in URLs</p>
+        </div>
+        <div className="space-y-2">
+          <label className="text-sm font-medium text-gray-400">ShareX Auto-Folder</label>
+          <input value={sharexFolderName} onChange={(e) => setSharexFolderName(e.target.value)} className={inputCls} placeholder="ShareX" />
+          <p className="text-xs text-gray-600">Uploads via API token are automatically placed in this folder</p>
         </div>
         <button onClick={saveSettings} className="bg-primary hover:bg-[var(--primary-hover)] text-white px-6 py-2.5 rounded-xl font-bold shadow-glow-primary transition-all hover:scale-105">Save Settings</button>
       </section>
