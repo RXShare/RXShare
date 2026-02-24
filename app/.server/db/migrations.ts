@@ -198,8 +198,9 @@ export function getNewTablesSQL(dbType: DbType): string[] {
     `CREATE TABLE IF NOT EXISTS short_links (
       id ${textType} PRIMARY KEY,
       code ${textType} NOT NULL UNIQUE,
-      upload_id ${textType} NOT NULL,
+      upload_id ${textType},
       user_id ${textType} NOT NULL,
+      external_url ${textType},
       clicks ${intType} NOT NULL DEFAULT 0,
       created_at ${autoTs},
       FOREIGN KEY (upload_id) REFERENCES uploads(id) ON DELETE CASCADE,

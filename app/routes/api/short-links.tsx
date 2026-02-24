@@ -32,7 +32,7 @@ export async function action({ request }: { request: Request }) {
       }
       const id = nanoid();
       const code = nanoid(6);
-      execute("INSERT INTO short_links (id, code, upload_id, user_id, external_url) VALUES (?, ?, ?, ?, ?)", [id, code, "", session.user.id, url]);
+      execute("INSERT INTO short_links (id, code, upload_id, user_id, external_url) VALUES (?, ?, ?, ?, ?)", [id, code, null, session.user.id, url]);
       return Response.json({ id, code });
     }
     

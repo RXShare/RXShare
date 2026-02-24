@@ -41,6 +41,25 @@ export async function initDatabase(): Promise<void> {
     for (const sql of getIndexSQL()) { try { adapter.exec(sql); } catch {} }
     for (const sql of getMigrationUpdates()) { try { adapter.exec(sql); } catch {} }
     for (const sql of getNewTablesSQL("sqlite")) { try { adapter.exec(sql); } catch {} }
+    // Rebuild short_links if upload_id is NOT NULL (needed for external URL support)
+    try {
+      const tableInfo = adapter.query<any>("PRAGMA table_info(short_links)", []);
+      const uploadIdCol = tableInfo.find((c: any) => c.name === "upload_id");
+      if (uploadIdCol && uploadIdCol.notnull === 1) {
+        adapter.exec("DROP TABLE IF EXISTS short_links_rebuild");
+        adapter.exec(`CREATE TABLE short_links_rebuild (
+          id TEXT PRIMARY KEY, code TEXT NOT NULL UNIQUE, upload_id TEXT, user_id TEXT NOT NULL,
+          external_url TEXT, clicks INTEGER NOT NULL DEFAULT 0,
+          created_at TEXT NOT NULL DEFAULT (datetime('now')),
+          FOREIGN KEY (upload_id) REFERENCES uploads(id) ON DELETE CASCADE,
+          FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+        )`);
+        adapter.exec("INSERT OR IGNORE INTO short_links_rebuild (id, code, upload_id, user_id, external_url, clicks, created_at) SELECT id, code, upload_id, user_id, external_url, clicks, created_at FROM short_links");
+        adapter.exec("DROP TABLE short_links");
+        adapter.exec("ALTER TABLE short_links_rebuild RENAME TO short_links");
+        adapter.exec("CREATE INDEX IF NOT EXISTS idx_short_links_code ON short_links(code)");
+      }
+    } catch {}
     initialized = true;
   }
 }
@@ -71,6 +90,25 @@ function ensureInit() {
     for (const sql of getIndexSQL()) { try { adapter.exec(sql); } catch {} }
     for (const sql of getMigrationUpdates()) { try { adapter.exec(sql); } catch {} }
     for (const sql of getNewTablesSQL("sqlite")) { try { adapter.exec(sql); } catch {} }
+    // Rebuild short_links if upload_id is NOT NULL (needed for external URL support)
+    try {
+      const tableInfo = adapter.query<any>("PRAGMA table_info(short_links)", []);
+      const uploadIdCol = tableInfo.find((c: any) => c.name === "upload_id");
+      if (uploadIdCol && uploadIdCol.notnull === 1) {
+        adapter.exec("DROP TABLE IF EXISTS short_links_rebuild");
+        adapter.exec(`CREATE TABLE short_links_rebuild (
+          id TEXT PRIMARY KEY, code TEXT NOT NULL UNIQUE, upload_id TEXT, user_id TEXT NOT NULL,
+          external_url TEXT, clicks INTEGER NOT NULL DEFAULT 0,
+          created_at TEXT NOT NULL DEFAULT (datetime('now')),
+          FOREIGN KEY (upload_id) REFERENCES uploads(id) ON DELETE CASCADE,
+          FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+        )`);
+        adapter.exec("INSERT OR IGNORE INTO short_links_rebuild (id, code, upload_id, user_id, external_url, clicks, created_at) SELECT id, code, upload_id, user_id, external_url, clicks, created_at FROM short_links");
+        adapter.exec("DROP TABLE short_links");
+        adapter.exec("ALTER TABLE short_links_rebuild RENAME TO short_links");
+        adapter.exec("CREATE INDEX IF NOT EXISTS idx_short_links_code ON short_links(code)");
+      }
+    } catch {}
     initialized = true;
   }
 }
