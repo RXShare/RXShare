@@ -27,7 +27,7 @@ export async function loader({ params, request }: { params: { fileName: string }
   const rangeHeader = request.headers.get("Range");
 
   if (rangeHeader) {
-    const { size: totalSize } = await storage.readStream(upload.file_path);
+    const totalSize = await storage.getSize(upload.file_path);
     const range = parseRange(rangeHeader, totalSize);
     if (!range) {
       return new Response("Range Not Satisfiable", {

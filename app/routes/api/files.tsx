@@ -51,8 +51,7 @@ export async function loader({ request }: { request: Request }) {
 
     // Range request (for video/audio seeking)
     if (rangeHeader) {
-      // Get total size first via a full stream metadata call
-      const { size: totalSize } = await storage.readStream(filePath);
+      const totalSize = await storage.getSize(filePath);
       const range = parseRange(rangeHeader, totalSize);
       if (!range) {
         return new Response("Range Not Satisfiable", {

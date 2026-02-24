@@ -1,21 +1,28 @@
-import { useState, useEffect } from "react";
-import { useNavigate, Link } from "react-router";
+import { useState } from "react";
+import { useNavigate, Link, useLoaderData } from "react-router";
 import { useToast } from "~/components/ui/use-toast";
 import { getCsrfToken } from "~/lib/csrf";
 
 const DEFAULT_LOGO = "https://cdn.rxss.click/rexsystems/logo-transparent.svg";
 
+export async function loader() {
+  const { queryOne, isFirstRun } = await import("~/.server/db");
+  if (isFirstRun()) return { settings: null };
+  try {
+    const settings = queryOne<any>("SELECT site_name, site_description, allow_registration, allow_login, primary_color, accent_color, logo_url, background_pattern FROM system_settings LIMIT 1");
+    return { settings: settings || null };
+  } catch {
+    return { settings: null };
+  }
+}
+
 export default function Login() {
+  const { settings } = useLoaderData<typeof loader>();
   const navigate = useNavigate();
   const { toast } = useToast();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
-  const [settings, setSettings] = useState<any>(null);
-
-  useEffect(() => {
-    fetch("/api/system-settings/public").then(r => r.json()).then(setSettings).catch(() => {});
-  }, []);
 
   const logo = settings?.logo_url?.trim() || DEFAULT_LOGO;
 

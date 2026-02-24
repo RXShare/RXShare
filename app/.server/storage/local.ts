@@ -52,6 +52,11 @@ export function createLocalStorage(): StorageAdapter {
       const stream = Readable.toWeb(nodeStream) as ReadableStream<Uint8Array>;
       return { stream, size: end - start + 1, totalSize: info.size };
     },
+    async getSize(filePath: string) {
+      const full = safePath(filePath);
+      const info = await stat(full);
+      return info.size;
+    },
     async delete(filePath: string) {
       try { await unlink(safePath(filePath)); } catch {}
     },

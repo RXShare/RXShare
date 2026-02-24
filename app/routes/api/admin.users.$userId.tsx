@@ -47,14 +47,15 @@ export async function action({ request, params }: { request: Request; params: { 
 
   if (request.method === "DELETE") {
     if (userId === session.user.id) return Response.json({ error: "Cannot delete yourself" }, { status: 400 });
-    // Delete user's files from storage
+    // Delete user's files from storage (parallel)
     const uploads = query<any>("SELECT file_path, thumbnail_path, preview_path FROM uploads WHERE user_id = ?", [userId]);
     const storage = await getStorage();
-    for (const u of uploads) {
-      await storage.delete(u.file_path);
-      if (u.thumbnail_path) await storage.delete(u.thumbnail_path);
-      if (u.preview_path) await storage.delete(u.preview_path);
-    }
+    const deleteOps = uploads.flatMap((u: any) => [
+      storage.delete(u.file_path),
+      u.thumbnail_path ? storage.delete(u.thumbnail_path) : null,
+      u.preview_path ? storage.delete(u.preview_path) : null,
+    ].filter(Boolean));
+    await Promise.allSettled(deleteOps);
     // Delete from DB (cascades handle related tables)
     execute("DELETE FROM uploads WHERE user_id = ?", [userId]);
     execute("DELETE FROM api_tokens WHERE user_id = ?", [userId]);

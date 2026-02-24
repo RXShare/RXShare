@@ -4,6 +4,7 @@ export interface StorageAdapter {
   read(filePath: string): Promise<Buffer>;
   readStream(filePath: string): Promise<{ stream: ReadableStream<Uint8Array>; size: number }>;
   readRangeStream(filePath: string, start: number, end: number): Promise<{ stream: ReadableStream<Uint8Array>; size: number; totalSize: number }>;
+  getSize(filePath: string): Promise<number>;
   delete(filePath: string): Promise<void>;
   exists(filePath: string): Promise<boolean>;
   getUrl(filePath: string, request?: Request): string;

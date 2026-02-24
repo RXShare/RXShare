@@ -1,12 +1,27 @@
 import { getSession } from "~/.server/session";
 import { queryOne } from "~/.server/db";
-import { writeFile, mkdir, readFile } from "fs/promises";
-import { existsSync } from "fs";
+import { mkdir } from "fs/promises";
+import { existsSync, createReadStream, createWriteStream } from "fs";
 import { join, extname } from "path";
+import { Readable } from "stream";
+import { stat } from "fs/promises";
 import { rateLimit } from "~/.server/rate-limit";
 import { validateCsrf } from "~/.server/csrf";
 
 const logoDir = join(process.cwd(), "data");
+const allowedExts = [".svg", ".png", ".jpg", ".jpeg", ".webp", ".gif", ".ico"];
+const mimeMap: Record<string, string> = {
+  ".svg": "image/svg+xml", ".png": "image/png", ".jpg": "image/jpeg",
+  ".jpeg": "image/jpeg", ".webp": "image/webp", ".gif": "image/gif", ".ico": "image/x-icon",
+};
+
+function findLogoFile(): { path: string; ext: string } | null {
+  for (const ext of allowedExts) {
+    const filePath = join(logoDir, `logo${ext}`);
+    if (existsSync(filePath)) return { path: filePath, ext };
+  }
+  return null;
+}
 
 export async function action({ request }: { request: Request }) {
   if (request.method !== "POST") return new Response("Method not allowed", { status: 405 });
@@ -32,40 +47,42 @@ export async function action({ request }: { request: Request }) {
   if (file.size > 5 * 1024 * 1024) return Response.json({ error: "Logo must be under 5MB" }, { status: 400 });
 
   const ext = extname(file.name).toLowerCase().replace(/[^a-z.]/g, "");
-  const allowedExts = [".svg", ".png", ".jpg", ".jpeg", ".webp", ".gif", ".ico"];
   const safeExt = allowedExts.includes(ext) ? ext : ".png";
   const fileName = `logo${safeExt}`;
   const filePath = join(logoDir, fileName);
 
   if (!existsSync(logoDir)) await mkdir(logoDir, { recursive: true });
-  const buffer = Buffer.from(await file.arrayBuffer());
-  await writeFile(filePath, buffer);
+
+  // Stream the upload to disk instead of buffering
+  const fileStream = file.stream() as ReadableStream<Uint8Array>;
+  const nodeReadable = Readable.fromWeb(fileStream as any);
+  const nodeWritable = createWriteStream(filePath);
+  await new Promise<void>((resolve, reject) => {
+    nodeReadable.pipe(nodeWritable);
+    nodeWritable.on("finish", resolve);
+    nodeWritable.on("error", reject);
+    nodeReadable.on("error", reject);
+  });
 
   return Response.json({ url: `/api/logo` });
 }
 
-export async function loader({ request }: { request: Request }) {
-  // Serve the logo file
-  const extensions = [".svg", ".png", ".jpg", ".jpeg", ".webp", ".gif", ".ico"];
-  for (const ext of extensions) {
-    const filePath = join(logoDir, `logo${ext}`);
-    if (existsSync(filePath)) {
-      const data = await readFile(filePath);
-      const mimeMap: Record<string, string> = {
-        ".svg": "image/svg+xml", ".png": "image/png", ".jpg": "image/jpeg",
-        ".jpeg": "image/jpeg", ".webp": "image/webp", ".gif": "image/gif", ".ico": "image/x-icon",
-      };
-      // Prevent SVG XSS — serve SVG logos as PNG-safe or force download
-      const safeType = ext === ".svg" ? "image/svg+xml" : (mimeMap[ext] || "application/octet-stream");
-      return new Response(data, {
-        headers: {
-          "Content-Type": safeType,
-          "Cache-Control": "public, max-age=3600",
-          "X-Content-Type-Options": "nosniff",
-          "Content-Security-Policy": "default-src 'none'; style-src 'unsafe-inline'",
-        },
-      });
-    }
-  }
-  return new Response("Not found", { status: 404 });
+export async function loader() {
+  const logo = findLogoFile();
+  if (!logo) return new Response("Not found", { status: 404 });
+
+  const info = await stat(logo.path);
+  const nodeStream = createReadStream(logo.path);
+  const stream = Readable.toWeb(nodeStream) as ReadableStream<Uint8Array>;
+  const contentType = mimeMap[logo.ext] || "application/octet-stream";
+
+  return new Response(stream, {
+    headers: {
+      "Content-Type": contentType,
+      "Content-Length": String(info.size),
+      "Cache-Control": "public, max-age=3600",
+      "X-Content-Type-Options": "nosniff",
+      "Content-Security-Policy": "default-src 'none'; style-src 'unsafe-inline'",
+    },
+  });
 }
