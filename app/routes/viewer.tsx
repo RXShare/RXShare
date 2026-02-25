@@ -174,7 +174,7 @@ export default function Viewer() {
               </button>
               {showQr && qrDataUrl && (
                 <div className="absolute right-0 top-full mt-2 p-3 bg-[#141414] rounded-xl border border-white/10 shadow-2xl z-50">
-                  <img src={qrDataUrl} alt="QR Code" className="w-72 h-72" />
+                  <img src={qrDataUrl} alt="QR Code" className="w-80 h-80" />
                 </div>
               )}
             </div>
