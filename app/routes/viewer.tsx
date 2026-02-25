@@ -172,13 +172,6 @@ export default function Viewer() {
                 <Icon name="qr_code_2" className="text-lg" />
                 <span className="hidden sm:inline">QR</span>
               </button>
-              {showQr && qrDataUrl && (
-                <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm">
-                  <div ref={qrRef} className="glass-card rounded-2xl border border-white/10 shadow-glow-card p-6">
-                    <img src={qrDataUrl} alt="QR Code" className="w-full h-full max-w-[80vmin] max-h-[80vmin]" />
-                  </div>
-                </div>
-              )}
             </div>
             <a href={fileUrl} download={upload.original_name}
               className="flex items-center gap-1.5 px-3 py-2 text-sm text-white bg-primary hover:bg-[var(--primary-hover)] rounded-lg shadow-glow-primary transition-all">
@@ -221,6 +214,15 @@ export default function Viewer() {
           </div>
         </div>
       </div>
+
+      {/* QR Code modal — outside sticky bar so fixed positioning works */}
+      {showQr && qrDataUrl && (
+        <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/60" onClick={() => setShowQr(false)}>
+          <div ref={qrRef} className="bg-[#141414] rounded-2xl border border-white/10 shadow-2xl p-6" onClick={(e) => e.stopPropagation()}>
+            <img src={qrDataUrl} alt="QR Code" style={{ width: "min(500px, 80vmin)", height: "min(500px, 80vmin)" }} />
+          </div>
+        </div>
+      )}
     </div>
   );
 }
