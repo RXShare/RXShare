@@ -175,7 +175,7 @@ export default function Viewer() {
               {showQr && qrDataUrl && (
                 <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm">
                   <div ref={qrRef} className="glass-card rounded-2xl border border-white/10 shadow-glow-card p-6">
-                    <img src={qrDataUrl} alt="QR Code" className="w-[500px] h-[500px]" />
+                    <img src={qrDataUrl} alt="QR Code" className="w-full h-full max-w-[80vmin] max-h-[80vmin]" />
                   </div>
                 </div>
               )}
