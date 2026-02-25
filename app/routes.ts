@@ -41,6 +41,7 @@ export default [
   route("api/system-settings/public", "routes/api/system-settings.public.tsx"),
   route("api/logo", "routes/api/logo.tsx"),
   route("api/files/*", "routes/api/files.tsx"),
+  route("api/raw/:fileName", "routes/api/raw.$fileName.tsx"),
   route("api/thumb/:id", "routes/api/thumb.$id.tsx"),
   route("api/short-links", "routes/api/short-links.tsx"),
   route("s/:code", "routes/s.$code.tsx"),

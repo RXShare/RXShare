@@ -124,7 +124,7 @@ export default function Viewer() {
 
   useEffect(() => {
     const shareUrl = `${data.baseUrl}/v/${upload.file_name}`;
-    QRCode.toDataURL(shareUrl, { width: 400, margin: 1, color: { dark: "#ffffff", light: "#00000000" } }).then(setQrDataUrl);
+    QRCode.toDataURL(shareUrl, { width: 500, margin: 1, color: { dark: "#ffffff", light: "#00000000" } }).then(setQrDataUrl);
   }, [data.baseUrl, upload.file_name]);
 
   useEffect(() => {
@@ -166,15 +166,17 @@ export default function Viewer() {
               <Icon name="open_in_new" className="text-lg" />
               <span className="hidden sm:inline">Raw</span>
             </a>
-            <div className="relative" ref={qrRef}>
+            <div className="relative">
               <button onClick={() => setShowQr(v => !v)}
                 className="flex items-center gap-1.5 px-3 py-2 text-sm text-gray-300 bg-white/5 hover:bg-white/10 border border-white/10 rounded-lg transition-colors">
                 <Icon name="qr_code_2" className="text-lg" />
                 <span className="hidden sm:inline">QR</span>
               </button>
               {showQr && qrDataUrl && (
-                <div className="absolute right-0 top-full mt-2 p-3 glass-card rounded-xl border border-white/10 shadow-glow-card z-50">
-                  <img src={qrDataUrl} alt="QR Code" className="w-[400px] h-[400px]" />
+                <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm">
+                  <div ref={qrRef} className="glass-card rounded-2xl border border-white/10 shadow-glow-card p-6">
+                    <img src={qrDataUrl} alt="QR Code" className="w-[500px] h-[500px]" />
+                  </div>
                 </div>
               )}
             </div>

@@ -110,7 +110,7 @@ export async function action({ request }: { request: Request }) {
   return Response.json({
     id: uploadId,
     url: `${baseUrl}/v/${fileName}`,
-    raw_url: `${baseUrl}/r/${fileName}`,
+    raw_url: `${baseUrl}/api/raw/${fileName}`,
     thumbnail_url: thumbnailPath ? `${baseUrl}/api/files/${thumbnailPath}` : null,
     delete_url: `${baseUrl}/api/delete/${uploadId}`,
     file_name: fileName,
