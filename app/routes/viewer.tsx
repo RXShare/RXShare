@@ -215,12 +215,10 @@ export default function Viewer() {
         </div>
       </div>
 
-      {/* QR Code modal — outside sticky bar so fixed positioning works */}
+      {/* QR Code dropdown — anchored to button via portal-like positioning */}
       {showQr && qrDataUrl && (
-        <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/60" onClick={() => setShowQr(false)}>
-          <div ref={qrRef} className="bg-[#141414] rounded-2xl border border-white/10 shadow-2xl p-6" onClick={(e) => e.stopPropagation()}>
-            <img src={qrDataUrl} alt="QR Code" style={{ width: "min(500px, 80vmin)", height: "min(500px, 80vmin)" }} />
-          </div>
+        <div ref={qrRef} className="fixed top-16 right-4 z-[9999] p-3 bg-[#141414] rounded-xl border border-white/10 shadow-2xl">
+          <img src={qrDataUrl} alt="QR Code" className="w-48 h-48" />
         </div>
       )}
     </div>
