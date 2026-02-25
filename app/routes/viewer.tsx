@@ -173,8 +173,10 @@ export default function Viewer() {
                 <span className="hidden sm:inline">QR</span>
               </button>
               {showQr && qrDataUrl && (
-                <div className="absolute right-0 top-full mt-2 p-3 bg-[#141414] rounded-xl border border-white/10 shadow-2xl z-50">
-                  <img src={qrDataUrl} alt="QR Code" width={320} height={320} style={{ width: 320, height: 320 }} />
+                <div className="absolute right-0 top-full mt-2 z-50" style={{ width: 336, minWidth: 336 }}>
+                  <div className="p-2 bg-[#141414] rounded-xl border border-white/10 shadow-2xl">
+                    <img src={qrDataUrl} alt="QR Code" className="block" style={{ width: 320, height: 320, minWidth: 320, maxWidth: 'none' }} />
+                  </div>
                 </div>
               )}
             </div>
