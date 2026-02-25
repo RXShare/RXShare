@@ -141,7 +141,7 @@ export default function Viewer() {
       <div className={`fixed inset-0 ${patClass} opacity-40 pointer-events-none`} />
 
       {/* Top bar */}
-      <div className="sticky top-0 z-20 glass border-b border-white/5">
+      <div className="sticky top-0 z-20 glass border-b border-white/5 overflow-visible">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 py-3 flex items-center justify-between gap-4">
           <div className="min-w-0 flex-1">
             <h1 className="text-base sm:text-lg font-bold text-white truncate">{upload.original_name}</h1>
@@ -166,12 +166,17 @@ export default function Viewer() {
               <Icon name="open_in_new" className="text-lg" />
               <span className="hidden sm:inline">Raw</span>
             </a>
-            <div className="relative">
+            <div className="relative" ref={qrRef}>
               <button onClick={() => setShowQr(v => !v)}
                 className="flex items-center gap-1.5 px-3 py-2 text-sm text-gray-300 bg-white/5 hover:bg-white/10 border border-white/10 rounded-lg transition-colors">
                 <Icon name="qr_code_2" className="text-lg" />
                 <span className="hidden sm:inline">QR</span>
               </button>
+              {showQr && qrDataUrl && (
+                <div className="absolute right-0 top-full mt-2 p-3 bg-[#141414] rounded-xl border border-white/10 shadow-2xl z-50">
+                  <img src={qrDataUrl} alt="QR Code" className="w-72 h-72" />
+                </div>
+              )}
             </div>
             <a href={fileUrl} download={upload.original_name}
               className="flex items-center gap-1.5 px-3 py-2 text-sm text-white bg-primary hover:bg-[var(--primary-hover)] rounded-lg shadow-glow-primary transition-all">
@@ -215,12 +220,6 @@ export default function Viewer() {
         </div>
       </div>
 
-      {/* QR Code dropdown — anchored to button via portal-like positioning */}
-      {showQr && qrDataUrl && (
-        <div ref={qrRef} className="fixed top-16 right-4 z-[9999] p-3 bg-[#141414] rounded-xl border border-white/10 shadow-2xl">
-          <img src={qrDataUrl} alt="QR Code" className="w-48 h-48" />
-        </div>
-      )}
     </div>
   );
 }
