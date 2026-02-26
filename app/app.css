@@ -45,8 +45,6 @@
   --muted-fg: #6b7280;
   --border-color: rgba(255,255,255,0.08);
   --radius: 0.75rem;
-  --glass-bg: rgba(20, 20, 20, 0.85);
-  --glass-border: rgba(255, 255, 255, 0.08);
 }
 
 @layer base {
@@ -69,60 +67,66 @@
   }
 }
 
-/* Glass utilities */
-.glass {
+@utility glass {
   background: rgba(20, 20, 20, 0.85);
   backdrop-filter: blur(24px);
   -webkit-backdrop-filter: blur(24px);
   border: 1px solid rgba(255, 255, 255, 0.08);
 }
 
-.glass-card {
+@utility glass-card {
   background: rgba(20, 20, 20, 0.6);
   backdrop-filter: blur(12px);
   -webkit-backdrop-filter: blur(12px);
   border: 1px solid rgba(255, 255, 255, 0.06);
   transition: all 0.3s ease;
 }
-.glass-card:hover {
-  border-color: rgba(var(--primary-r), var(--primary-g), var(--primary-b), 0.3);
-  box-shadow: 0 0 0 1px rgba(var(--primary-r), var(--primary-g), var(--primary-b), 0.3), 0 8px 30px -5px rgba(0,0,0,0.6);
+
+@utility shadow-glow-primary {
+  box-shadow: 0 0 20px -5px rgba(var(--primary-r), var(--primary-g), var(--primary-b), 0.3);
 }
 
-/* Background patterns */
-.bg-pattern-grid {
+@utility shadow-glow-card {
+  box-shadow: 0 0 0 1px rgba(255,255,255,0.05), 0 4px 20px -5px rgba(0,0,0,0.5);
+}
+
+@utility bg-pattern-grid {
   background-image: url("data:image/svg+xml,%3Csvg width='40' height='40' viewBox='0 0 40 40' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M0 0h40v40H0V0zm1 1h38v38H1V1z' fill='%23ffffff' fill-opacity='0.08' fill-rule='evenodd'/%3E%3C/svg%3E");
 }
-.bg-pattern-dots {
+
+@utility bg-pattern-dots {
   background-image: radial-gradient(circle, rgba(255,255,255,0.1) 1px, transparent 1px);
   background-size: 24px 24px;
 }
-.bg-pattern-triangles {
+
+@utility bg-pattern-triangles {
   background-image: url("data:image/svg+xml,%3Csvg width='40' height='40' viewBox='0 0 40 40' xmlns='http://www.w3.org/2000/svg'%3E%3Cpolygon points='20,4 36,36 4,36' fill='none' stroke='%23ffffff' stroke-opacity='0.08' stroke-width='1'/%3E%3C/svg%3E");
 }
-.bg-pattern-crosshatch {
+
+@utility bg-pattern-crosshatch {
   background-image: url("data:image/svg+xml,%3Csvg width='20' height='20' viewBox='0 0 20 20' xmlns='http://www.w3.org/2000/svg'%3E%3Cline x1='0' y1='0' x2='20' y2='20' stroke='%23ffffff' stroke-opacity='0.06' stroke-width='0.5'/%3E%3Cline x1='20' y1='0' x2='0' y2='20' stroke='%23ffffff' stroke-opacity='0.06' stroke-width='0.5'/%3E%3C/svg%3E");
 }
-.bg-pattern-diagonal {
+
+@utility bg-pattern-diagonal {
   background-image: url("data:image/svg+xml,%3Csvg width='20' height='20' viewBox='0 0 20 20' xmlns='http://www.w3.org/2000/svg'%3E%3Cline x1='0' y1='20' x2='20' y2='0' stroke='%23ffffff' stroke-opacity='0.06' stroke-width='0.5'/%3E%3C/svg%3E");
 }
-.bg-pattern-hexagons {
+
+@utility bg-pattern-hexagons {
   background-image: url("data:image/svg+xml,%3Csvg width='56' height='48' viewBox='0 0 56 48' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M28 0L56 16v32L28 48 0 32V16z' fill='none' stroke='%23ffffff' stroke-opacity='0.06' stroke-width='0.5'/%3E%3C/svg%3E");
 }
-.bg-pattern-none {
+
+@utility bg-pattern-none {
   background-image: none;
 }
-/* Keep old class as alias */
-.bg-grid-pattern {
+
+@utility bg-grid-pattern {
   background-image: url("data:image/svg+xml,%3Csvg width='40' height='40' viewBox='0 0 40 40' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M0 0h40v40H0V0zm1 1h38v38H1V1z' fill='%23ffffff' fill-opacity='0.08' fill-rule='evenodd'/%3E%3C/svg%3E");
 }
 
-/* Glow shadows — use CSS vars */
-.shadow-glow-primary {
-  box-shadow: 0 0 20px -5px rgba(var(--primary-r), var(--primary-g), var(--primary-b), 0.3);
-}
-.shadow-glow-card {
-  box-shadow: 0 0 0 1px rgba(255,255,255,0.05), 0 4px 20px -5px rgba(0,0,0,0.5);
+/* glass-card hover — can't be in @utility, keep outside */
+.glass-card:hover {
+  border-color: rgba(var(--primary-r), var(--primary-g), var(--primary-b), 0.3);
+  box-shadow: 0 0 0 1px rgba(var(--primary-r), var(--primary-g), var(--primary-b), 0.3), 0 8px 30px -5px rgba(0,0,0,0.6);
 }
 
 /* Nice scrollbar */
