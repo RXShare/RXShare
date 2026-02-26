@@ -2,7 +2,7 @@ import { useState } from "react";
 import { useLoaderData, useOutletContext, useRevalidator } from "react-router";
 import { getSession } from "~/.server/session";
 import { query, queryOne } from "~/.server/db";
-import { formatRelativeDate, generateToken } from "~/lib/utils-format";
+import { formatRelativeDate, generateToken, getAvatarUrl } from "~/lib/utils-format";
 import { useToast } from "~/components/ui/use-toast";
 import { Switch } from "~/components/ui/switch";
 import { Icon } from "~/components/Icon";
@@ -34,6 +34,25 @@ export default function SettingsPage() {
   const [sharexUrlMode, setSharexUrlMode] = useState<"raw" | "viewer">(settings?.sharex_url_mode || "raw");
   const [tokenName, setTokenName] = useState("");
   const [newToken, setNewToken] = useState<string | null>(null);
+  const [avatarUploading, setAvatarUploading] = useState(false);
+
+  const uploadAvatar = async (file: File) => {
+    setAvatarUploading(true);
+    try {
+      const form = new FormData();
+      form.append("avatar", file);
+      const res = await fetch("/api/user/avatar", { method: "POST", headers: { ...(getCsrfToken() ? { "X-CSRF-Token": getCsrfToken()! } : {}) }, body: form });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error);
+      revalidator.revalidate(); toast({ title: "Avatar updated" });
+    } catch (err: any) { toast({ title: "Failed", description: err.message, variant: "destructive" }); }
+    finally { setAvatarUploading(false); }
+  };
+
+  const removeAvatar = async () => {
+    const res = await fetch("/api/user/avatar", { method: "DELETE", headers: { ...(getCsrfToken() ? { "X-CSRF-Token": getCsrfToken()! } : {}) } });
+    if (res.ok) { revalidator.revalidate(); toast({ title: "Avatar removed" }); }
+  };
 
   const saveSettings = async () => {
     const res = await fetch("/api/user/settings", {
@@ -80,6 +99,29 @@ export default function SettingsPage() {
         <h1 className="text-3xl font-bold text-white mb-1">Settings</h1>
         <p className="text-gray-500 text-sm">Customize your upload preferences and API access</p>
       </div>
+
+      {/* Avatar */}
+      <section className="bg-[#141414] border border-white/5 rounded-2xl p-8 shadow-glow-card space-y-6">
+        <h3 className="text-xl font-bold text-white flex items-center gap-2"><span className="w-1 h-6 bg-primary rounded-full" /> Profile Picture</h3>
+        <div className="flex items-center gap-6">
+          <div className="relative group">
+            <div className="w-20 h-20 rounded-full overflow-hidden ring-2 ring-primary/50 bg-gray-800">
+              <img src={getAvatarUrl(user?.username || user?.email || "", 80, user?.avatar_url)} alt="" className="w-full h-full object-cover" />
+            </div>
+            <label className="absolute inset-0 flex items-center justify-center bg-black/50 rounded-full opacity-0 group-hover:opacity-100 transition-opacity cursor-pointer">
+              <Icon name="photo_camera" className="text-white text-2xl" />
+              <input type="file" accept="image/jpeg,image/png,image/gif,image/webp" className="hidden" onChange={(e) => { const f = e.target.files?.[0]; if (f) uploadAvatar(f); e.target.value = ""; }} />
+            </label>
+          </div>
+          <div className="space-y-2">
+            <p className="text-sm text-gray-400">{avatarUploading ? "Uploading..." : "Click the avatar to upload a new one"}</p>
+            <p className="text-xs text-gray-600">JPEG, PNG, GIF, or WebP. Max 5MB.</p>
+            {user?.avatar_url && (
+              <button onClick={removeAvatar} className="text-xs text-red-400 hover:text-red-300 transition-colors">Remove custom avatar</button>
+            )}
+          </div>
+        </div>
+      </section>
 
       {/* Embed settings */}
       <section className="bg-[#141414] border border-white/5 rounded-2xl p-8 shadow-glow-card space-y-6">

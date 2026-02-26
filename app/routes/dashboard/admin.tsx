@@ -14,7 +14,7 @@ import { getCsrfToken } from "~/lib/csrf";
 export async function loader({ request }: { request: Request }) {
   const session = await getSession(request);
   if (!session || !isAdmin(session.user.id)) throw new Response(null, { status: 302, headers: { Location: "/dashboard" } });
-  const users = query<any>("SELECT u.*, us.disk_quota, us.disk_used, us.is_admin, us.is_active, us.max_upload_size FROM users u LEFT JOIN user_settings us ON u.id = us.user_id ORDER BY u.created_at");
+  const users = query<any>("SELECT u.*, us.disk_quota, us.disk_used, us.is_admin, us.is_active, us.max_upload_size, us.avatar_url FROM users u LEFT JOIN user_settings us ON u.id = us.user_id ORDER BY u.created_at");
   const allUploads = query<any>("SELECT id, user_id, file_size FROM uploads");
   const systemSettings = queryOne<any>("SELECT * FROM system_settings LIMIT 1");
   return { users, allUploads, systemSettings, currentUserId: session.user.id };
@@ -182,7 +182,7 @@ function UsersTab({ users, allUploads, currentUserId, toast, revalidator }: any)
                       <div className="relative">
                         <div className={cn("w-10 h-10 rounded-full p-0.5", u.is_admin === 1 ? "bg-gradient-to-br from-primary to-[var(--primary-hover)]" : "bg-gray-800")}>
                           <div className="w-full h-full rounded-full bg-black flex items-center justify-center overflow-hidden">
-                            <img alt="" className="w-full h-full object-cover opacity-90" src={getAvatarUrl(u.username || u.email)} />
+                            <img alt="" className="w-full h-full object-cover opacity-90" src={getAvatarUrl(u.username || u.email, 80, u.avatar_url)} />
                           </div>
                         </div>
                         <div className={cn("absolute -bottom-0.5 -right-0.5 w-3 h-3 rounded-full border-2 border-[#141414]",

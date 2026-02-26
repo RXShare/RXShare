@@ -27,6 +27,7 @@ export default [
   route("api/trash/cleanup", "routes/api/trash.cleanup.tsx"),
   route("api/tokens", "routes/api/tokens.tsx"),
   route("api/user/settings", "routes/api/user.settings.tsx"),
+  route("api/user/avatar", "routes/api/user.avatar.tsx"),
   route("api/admin/system-settings", "routes/api/admin.system-settings.tsx"),
   route("api/admin/users/:userId", "routes/api/admin.users.$userId.tsx"),
   route("api/admin/users/create", "routes/api/admin.users.create.tsx"),

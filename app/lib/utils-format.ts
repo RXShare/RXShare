@@ -21,7 +21,8 @@ export function formatRelativeDate(dateStr: string): string {
   return date.toLocaleDateString();
 }
 
-export function getAvatarUrl(seed: string, size = 80): string {
+export function getAvatarUrl(seed: string, size = 80, customAvatarPath?: string | null): string {
+  if (customAvatarPath) return `/api/files/${customAvatarPath}`;
   const initials = seed
     .split(/[\s@._-]+/)
     .filter(Boolean)
