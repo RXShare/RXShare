@@ -27,7 +27,7 @@ function getBgPatternClass(systemSettings: any): string {
   return `bg-pattern-${pat}`;
 }
 
-function PageContent({ children, path }: { children: React.ReactNode; path: string }) {
+function PageContent({ children, path, center }: { children: React.ReactNode; path: string; center?: boolean }) {
   const ref = useRef<HTMLDivElement>(null);
   const prevPath = useRef(path);
   useEffect(() => {
@@ -41,7 +41,7 @@ function PageContent({ children, path }: { children: React.ReactNode; path: stri
       prevPath.current = path;
     }
   }, [path]);
-  return <div ref={ref}>{children}</div>;
+  return <div ref={ref} className={center ? "[&>*]:mx-auto" : ""}>{children}</div>;
 }
 
 // ========== SIDEBAR LAYOUT ==========
@@ -179,7 +179,7 @@ export function HeaderLayout({ children, user, systemSettings, isAdmin: admin }:
         </div>
       </header>
       <main className="container mx-auto p-4 md:p-8 relative z-10">
-        <PageContent path={location.pathname}>{children}</PageContent>
+        <PageContent path={location.pathname} center>{children}</PageContent>
       </main>
     </div>
   );
@@ -196,7 +196,7 @@ export function FloatingLayout({ children, user, systemSettings, isAdmin: admin 
     <div className="min-h-screen pb-24 text-gray-300 antialiased font-sans relative" style={{ scrollbarGutter: "stable" }}>
       <div className={cn("fixed inset-0 opacity-40 pointer-events-none z-0", pat)} />
       <main className="container mx-auto p-4 md:p-8 relative z-10">
-        <PageContent path={location.pathname}>{children}</PageContent>
+        <PageContent path={location.pathname} center>{children}</PageContent>
       </main>
       <div className="fixed bottom-4 left-1/2 -translate-x-1/2 z-50">
         <div className="glass flex items-center gap-1 rounded-2xl px-3 py-2 shadow-2xl">
