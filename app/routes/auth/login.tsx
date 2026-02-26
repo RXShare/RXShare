@@ -95,7 +95,7 @@ export default function Login() {
                 <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/10 to-transparent skew-x-12 translate-x-[-150%] animate-[shimmer_3s_infinite]" />
               </button>
             </form>
-            {settings?.allow_registration && (
+            {settings?.allow_registration === 1 && (
               <p className="text-center text-sm text-gray-500 mt-6">
                 Don't have an account?{" "}
                 <Link to="/auth/sign-up" className="text-primary hover:text-[var(--primary-hover)] font-medium transition-colors">Sign up</Link>
