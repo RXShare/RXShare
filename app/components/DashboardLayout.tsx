@@ -199,7 +199,7 @@ export function FloatingLayout({ children, user, systemSettings, isAdmin: admin 
         <PageContent path={location.pathname}>{children}</PageContent>
       </main>
       <div className="fixed bottom-4 left-1/2 -translate-x-1/2 z-50">
-        <div className="glass flex items-center gap-1 rounded-2xl px-3 py-2 shadow-2xl">
+        <div className="glass flex items-center gap-1 rounded-2xl px-3 py-2 shadow-2xl" style={{ background: 'rgba(20, 20, 20, 0.85)', backdropFilter: 'blur(24px)', WebkitBackdropFilter: 'blur(24px)' }}>
           <button onClick={() => navigate("/dashboard")} className="flex items-center gap-2 px-3 py-2 mr-1 hover:opacity-80 transition-opacity">
             <img src={getLogo(systemSettings)} alt="" className="h-9 w-9 object-contain" />
           </button>
