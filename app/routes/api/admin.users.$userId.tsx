@@ -21,7 +21,9 @@ export async function action({ request, params }: { request: Request; params: { 
 
   if (request.method === "PATCH") {
     const body = await request.json();
-    const allowed = ["is_admin", "is_active", "disk_quota", "max_upload_size"];
+    const isSelf = userId === session.user.id;
+    // When editing yourself, only allow quota/upload size changes — no role or status changes
+    const allowed = isSelf ? ["disk_quota", "max_upload_size"] : ["is_admin", "is_active", "disk_quota", "max_upload_size"];
     const sets: string[] = [];
     const vals: any[] = [];
     for (const key of allowed) {

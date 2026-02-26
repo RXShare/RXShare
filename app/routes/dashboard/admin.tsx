@@ -216,18 +216,20 @@ function UsersTab({ users, allUploads, currentUserId, toast, revalidator }: any)
                     <div className="text-xs text-gray-600">{getUserUploadCount(u.id)} files</div>
                   </td>
                   <td className="px-6 py-4 text-right">
-                    {!isSelf && (
-                      <div className="flex items-center justify-end gap-1">
-                        <button onClick={() => { setEditUser(u); setEditQuota(String(Math.round((u.disk_quota || 0) / 1024 / 1024))); setEditMaxUpload(String(Math.round((u.max_upload_size || 0) / 1024 / 1024))); }}
-                          className="p-2 text-gray-500 hover:text-white hover:bg-white/10 rounded-lg transition-all"><Icon name="edit" /></button>
-                        <button onClick={() => toggleAdmin(u.id)}
-                          className="p-2 text-gray-500 hover:text-white hover:bg-white/10 rounded-lg transition-all"><Icon name={u.is_admin ? "shield" : "admin_panel_settings"} /></button>
-                        <button onClick={() => toggleActive(u.id)}
-                          className={cn("p-2 hover:bg-white/10 rounded-lg transition-all", u.is_active !== 0 ? "text-green-500" : "text-red-500")}><Icon name={u.is_active !== 0 ? "check_circle" : "block"} /></button>
-                        <button onClick={() => setDeleteUser(u)}
-                          className="p-2 text-gray-500 hover:text-red-400 hover:bg-red-500/10 rounded-lg transition-all"><Icon name="delete" /></button>
-                      </div>
-                    )}
+                    <div className="flex items-center justify-end gap-1">
+                      <button onClick={() => { setEditUser(u); setEditQuota(String(Math.round((u.disk_quota || 0) / 1024 / 1024))); setEditMaxUpload(String(Math.round((u.max_upload_size || 0) / 1024 / 1024))); }}
+                        className="p-2 text-gray-500 hover:text-white hover:bg-white/10 rounded-lg transition-all"><Icon name="edit" /></button>
+                      {!isSelf && (
+                        <>
+                          <button onClick={() => toggleAdmin(u.id)}
+                            className="p-2 text-gray-500 hover:text-white hover:bg-white/10 rounded-lg transition-all"><Icon name={u.is_admin ? "shield" : "admin_panel_settings"} /></button>
+                          <button onClick={() => toggleActive(u.id)}
+                            className={cn("p-2 hover:bg-white/10 rounded-lg transition-all", u.is_active !== 0 ? "text-green-500" : "text-red-500")}><Icon name={u.is_active !== 0 ? "check_circle" : "block"} /></button>
+                          <button onClick={() => setDeleteUser(u)}
+                            className="p-2 text-gray-500 hover:text-red-400 hover:bg-red-500/10 rounded-lg transition-all"><Icon name="delete" /></button>
+                        </>
+                      )}
+                    </div>
                   </td>
                 </tr>
               );
@@ -253,7 +255,12 @@ function UsersTab({ users, allUploads, currentUserId, toast, revalidator }: any)
       {/* Edit dialog */}
       <Dialog open={!!editUser} onOpenChange={() => setEditUser(null)}>
         <DialogContent className="bg-[#141414] border-white/10">
-          <DialogHeader><DialogTitle className="text-white">Edit {editUser?.username || editUser?.email}</DialogTitle></DialogHeader>
+          <DialogHeader>
+            <DialogTitle className="text-white">Edit {editUser?.username || editUser?.email}{editUser?.id === currentUserId ? " (You)" : ""}</DialogTitle>
+            {editUser?.id === currentUserId && (
+              <DialogDescription className="text-gray-500">You can only modify your quota and upload limits.</DialogDescription>
+            )}
+          </DialogHeader>
           <div className="space-y-4">
             <div className="space-y-2"><label className="text-sm font-medium text-gray-400">Disk Quota (MB)</label><input type="number" value={editQuota} onChange={(e) => setEditQuota(e.target.value)} className={inputCls} /></div>
             <div className="space-y-2"><label className="text-sm font-medium text-gray-400">Max Upload Size (MB)</label><input type="number" value={editMaxUpload} onChange={(e) => setEditMaxUpload(e.target.value)} className={inputCls} /></div>
