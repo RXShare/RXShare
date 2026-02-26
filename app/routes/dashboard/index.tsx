@@ -62,6 +62,12 @@ export default function UploadsPage() {
   const [filterType, setFilterType] = useState<string>("");
   const [filterStatus, setFilterStatus] = useState<string>("");
   const [showFilters, setShowFilters] = useState(false);
+  const [page, setPage] = useState(1);
+  const perPage = 24;
+  const [typeDropdownOpen, setTypeDropdownOpen] = useState(false);
+  const [statusDropdownOpen, setStatusDropdownOpen] = useState(false);
+  const typeRef = useRef<HTMLDivElement>(null);
+  const statusRef = useRef<HTMLDivElement>(null);
 
   const toggleSelect = (id: string) => {
     setSelectedIds(prev => {
@@ -102,6 +108,22 @@ export default function UploadsPage() {
     const matchesStatus = !filterStatus || (filterStatus === "public" ? u.is_public : !u.is_public);
     return matchesSearch && matchesFolder && matchesType && matchesStatus;
   });
+
+  const totalPages = Math.ceil(filteredUploads.length / perPage);
+  const paginatedUploads = filteredUploads.slice((page - 1) * perPage, page * perPage);
+
+  // Reset page when filters change
+  useEffect(() => { setPage(1); }, [search, filterType, filterStatus, activeFolder]);
+
+  // Close dropdowns on outside click
+  useEffect(() => {
+    const handler = (e: MouseEvent) => {
+      if (typeRef.current && !typeRef.current.contains(e.target as Node)) setTypeDropdownOpen(false);
+      if (statusRef.current && !statusRef.current.contains(e.target as Node)) setStatusDropdownOpen(false);
+    };
+    document.addEventListener("mousedown", handler);
+    return () => document.removeEventListener("mousedown", handler);
+  }, []);
 
   const totalSize = uploads.reduce((acc: number, u: any) => acc + u.file_size, 0);
   const quota = settings?.disk_quota || 1073741824;
@@ -319,23 +341,44 @@ export default function UploadsPage() {
       </header>
       {showFilters && (
         <div className="flex items-center gap-3 flex-wrap">
-          <select value={filterType} onChange={(e) => setFilterType(e.target.value)}
-            className="px-3 py-2 border border-white/10 rounded-lg bg-[#0a0a0a] text-gray-300 focus:outline-none focus:ring-1 focus:ring-primary text-sm">
-            <option value="">All Types</option>
-            <option value="image">Images</option>
-            <option value="video">Video</option>
-            <option value="audio">Audio</option>
-            <option value="text">Text</option>
-            <option value="code">Code</option>
-            <option value="pdf">PDF</option>
-            <option value="other">Other</option>
-          </select>
-          <select value={filterStatus} onChange={(e) => setFilterStatus(e.target.value)}
-            className="px-3 py-2 border border-white/10 rounded-lg bg-[#0a0a0a] text-gray-300 focus:outline-none focus:ring-1 focus:ring-primary text-sm">
-            <option value="">All Status</option>
-            <option value="public">Public</option>
-            <option value="private">Private</option>
-          </select>
+          <div className="relative" ref={typeRef}>
+            <button onClick={() => { setTypeDropdownOpen(v => !v); setStatusDropdownOpen(false); }}
+              className={cn("flex items-center gap-2 px-4 py-2.5 border rounded-xl text-sm font-medium transition-all",
+                filterType ? "bg-primary/20 text-primary border-primary/30" : "bg-[#0a0a0a] text-gray-400 border-white/10 hover:border-white/20")}>
+              <Icon name="filter_list" className="text-base" />
+              {filterType ? { image: "Images", video: "Video", audio: "Audio", text: "Text", code: "Code", pdf: "PDF", other: "Other" }[filterType] : "All Types"}
+              <Icon name="expand_more" className="text-base" />
+            </button>
+            {typeDropdownOpen && (
+              <div className="absolute top-full left-0 mt-1 w-44 bg-[#141414] border border-white/10 rounded-xl shadow-2xl z-50 py-1 overflow-hidden">
+                {[{ v: "", l: "All Types" }, { v: "image", l: "Images" }, { v: "video", l: "Video" }, { v: "audio", l: "Audio" }, { v: "text", l: "Text" }, { v: "code", l: "Code" }, { v: "pdf", l: "PDF" }, { v: "other", l: "Other" }].map(o => (
+                  <button key={o.v} onClick={() => { setFilterType(o.v); setTypeDropdownOpen(false); }}
+                    className={cn("w-full text-left px-4 py-2 text-sm transition-colors", filterType === o.v ? "bg-primary/20 text-primary" : "text-gray-300 hover:bg-white/5 hover:text-white")}>
+                    {o.l}
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
+          <div className="relative" ref={statusRef}>
+            <button onClick={() => { setStatusDropdownOpen(v => !v); setTypeDropdownOpen(false); }}
+              className={cn("flex items-center gap-2 px-4 py-2.5 border rounded-xl text-sm font-medium transition-all",
+                filterStatus ? "bg-primary/20 text-primary border-primary/30" : "bg-[#0a0a0a] text-gray-400 border-white/10 hover:border-white/20")}>
+              <Icon name={filterStatus === "public" ? "visibility" : filterStatus === "private" ? "visibility_off" : "toggle_on"} className="text-base" />
+              {filterStatus ? (filterStatus === "public" ? "Public" : "Private") : "All Status"}
+              <Icon name="expand_more" className="text-base" />
+            </button>
+            {statusDropdownOpen && (
+              <div className="absolute top-full left-0 mt-1 w-40 bg-[#141414] border border-white/10 rounded-xl shadow-2xl z-50 py-1 overflow-hidden">
+                {[{ v: "", l: "All Status" }, { v: "public", l: "Public" }, { v: "private", l: "Private" }].map(o => (
+                  <button key={o.v} onClick={() => { setFilterStatus(o.v); setStatusDropdownOpen(false); }}
+                    className={cn("w-full text-left px-4 py-2 text-sm transition-colors", filterStatus === o.v ? "bg-primary/20 text-primary" : "text-gray-300 hover:bg-white/5 hover:text-white")}>
+                    {o.l}
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
           {(filterType || filterStatus) && (
             <button onClick={() => { setFilterType(""); setFilterStatus(""); }}
               className="px-3 py-2 text-xs text-gray-400 hover:text-white hover:bg-white/5 rounded-lg border border-white/10 transition-colors flex items-center gap-1">
@@ -508,7 +551,7 @@ export default function UploadsPage() {
         </div>
       ) : viewMode === "grid" ? (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6 pb-10">
-          {filteredUploads.map((upload: any) => {
+          {paginatedUploads.map((upload: any) => {
             const isImage = getMimeCategory(upload.mime_type) === "image";
             const ext = upload.original_name.split(".").pop()?.toUpperCase() || "FILE";
             return (
@@ -618,7 +661,7 @@ export default function UploadsPage() {
               </tr>
             </thead>
             <tbody className="divide-y divide-white/5">
-              {filteredUploads.map((upload: any) => (
+              {paginatedUploads.map((upload: any) => (
                 <tr key={upload.id} className={cn("group hover:bg-white/[0.03] transition-colors duration-200 cursor-pointer", selectedIds.has(upload.id) && "bg-primary/5")} onClick={() => setPreviewFile(upload)}>
                   <td className="px-3 py-4" onClick={(e) => e.stopPropagation()}>
                     <button onClick={() => toggleSelect(upload.id)}
@@ -677,9 +720,37 @@ export default function UploadsPage() {
             </tbody>
           </table>
           <div className="px-6 py-4 border-t border-white/5 flex items-center justify-between bg-white/[0.02]">
-            <div className="text-xs text-gray-500">Showing <span className="text-white font-medium">{filteredUploads.length}</span> of <span className="text-white font-medium">{uploads.length}</span> files</div>
+            <div className="text-xs text-gray-500">Showing <span className="text-white font-medium">{paginatedUploads.length}</span> of <span className="text-white font-medium">{filteredUploads.length}</span> files</div>
           </div>
           </div>
+        </div>
+      )}
+
+      {/* Pagination */}
+      {totalPages > 1 && (
+        <div className="flex items-center justify-center gap-2 pb-8">
+          <button onClick={() => setPage(p => Math.max(1, p - 1))} disabled={page === 1}
+            className="p-2 rounded-lg text-gray-400 hover:text-white hover:bg-white/5 border border-white/10 transition-colors disabled:opacity-30 disabled:cursor-not-allowed">
+            <Icon name="chevron_left" className="text-lg" />
+          </button>
+          {Array.from({ length: Math.min(totalPages, 7) }, (_, i) => {
+            let p: number;
+            if (totalPages <= 7) p = i + 1;
+            else if (page <= 4) p = i + 1;
+            else if (page >= totalPages - 3) p = totalPages - 6 + i;
+            else p = page - 3 + i;
+            return (
+              <button key={p} onClick={() => setPage(p)}
+                className={cn("w-9 h-9 rounded-lg text-sm font-medium transition-all",
+                  page === p ? "bg-primary text-white shadow-glow-primary" : "text-gray-400 hover:text-white hover:bg-white/5 border border-white/10")}>
+                {p}
+              </button>
+            );
+          })}
+          <button onClick={() => setPage(p => Math.min(totalPages, p + 1))} disabled={page === totalPages}
+            className="p-2 rounded-lg text-gray-400 hover:text-white hover:bg-white/5 border border-white/10 transition-colors disabled:opacity-30 disabled:cursor-not-allowed">
+            <Icon name="chevron_right" className="text-lg" />
+          </button>
         </div>
       )}
 
