@@ -124,9 +124,9 @@ export default function UserViewer() {
                   </div>
                   <div className="aspect-[4/3] w-full bg-gray-800 relative overflow-hidden">
                     {isImage && upload.thumbnail_path ? (
-                      <img src={`/api/files/${upload.thumbnail_path}`} alt="" className="w-full h-full object-cover transform group-hover:scale-110 transition-transform duration-700" loading="lazy" />
+                      <img src={`/api/files/${upload.thumbnail_path}`} alt="" className="w-full h-full object-contain transform group-hover:scale-110 transition-transform duration-700" loading="lazy" />
                     ) : isImage ? (
-                      <img src={`/api/files/${upload.file_path}`} alt="" className="w-full h-full object-cover transform group-hover:scale-110 transition-transform duration-700" loading="lazy" />
+                      <img src={`/api/files/${upload.file_path}`} alt="" className="w-full h-full object-contain transform group-hover:scale-110 transition-transform duration-700" loading="lazy" />
                     ) : (
                       <div className="w-full h-full flex items-center justify-center bg-[#1e1e1e] relative">
                         <div className="absolute inset-0 bg-grid-pattern opacity-10" />

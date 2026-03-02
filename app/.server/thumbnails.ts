@@ -6,7 +6,7 @@ export async function generateThumbnail(filePath: string, mimeType: string): Pro
   try {
     const storage = await getStorage();
     const data = await storage.read(filePath);
-    const thumb = await sharp(data).resize(300, 300, { fit: "cover" }).webp({ quality: 75 }).toBuffer();
+    const thumb = await sharp(data).resize(300, 300, { fit: "inside" }).webp({ quality: 75 }).toBuffer();
     const thumbPath = filePath.replace(/\.[^.]+$/, "_thumb.webp");
     await storage.save(thumbPath, thumb);
     return thumbPath;
@@ -44,7 +44,7 @@ export async function generateThumbnails(filePath: string, mimeType: string): Pr
 
     // Run both sharp operations in parallel from the same buffer
     const [thumbResult, previewResult] = await Promise.allSettled([
-      sharp(data).resize(300, 300, { fit: "cover" }).webp({ quality: 75 }).toBuffer(),
+      sharp(data).resize(300, 300, { fit: "inside" }).webp({ quality: 75 }).toBuffer(),
       sharp(data).resize(1200, 630, { fit: "inside" }).webp({ quality: 80 }).toBuffer(),
     ]);
 

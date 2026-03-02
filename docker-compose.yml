@@ -2,7 +2,7 @@ services:
   rxshare:
     build: .
     ports:
-      - "3000:3000"
+      - "6910:3000"
     volumes:
       - rxshare-data:/app/data
     env_file:
