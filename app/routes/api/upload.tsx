@@ -54,7 +54,7 @@ export async function action({ request }: { request: Request }) {
   if (settings.disk_used + file.size > settings.disk_quota) return Response.json({ error: "Quota exceeded" }, { status: 413 });
 
   const ext = (file.name.split(".").pop() || "bin").replace(/[^a-zA-Z0-9]/g, "").slice(0, 10) || "bin";
-  const fileName = `${nanoid(10)}.${ext}`;
+  const fileName = `${nanoid(16)}.${ext}`;
   const filePath = `${user.id}/${fileName}`;
 
   const storage = await getStorage();
