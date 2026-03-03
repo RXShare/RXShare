@@ -32,6 +32,7 @@ export default function SettingsPage() {
   const [customPath, setCustomPath] = useState(settings?.custom_path || "");
   const [sharexFolderName, setSharexFolderName] = useState(settings?.sharex_folder_name ?? "ShareX");
   const [sharexUrlMode, setSharexUrlMode] = useState<"raw" | "viewer">(settings?.sharex_url_mode || "raw");
+  const [duplicateHandling, setDuplicateHandling] = useState<"reject" | "reuse" | "allow">(settings?.duplicate_handling || "reject");
   const [tokenName, setTokenName] = useState("");
   const [newToken, setNewToken] = useState<string | null>(null);
   const [avatarUploading, setAvatarUploading] = useState(false);
@@ -57,7 +58,7 @@ export default function SettingsPage() {
   const saveSettings = async () => {
     const res = await fetch("/api/user/settings", {
       method: "PUT", headers: { "Content-Type": "application/json", ...(getCsrfToken() ? { "X-CSRF-Token": getCsrfToken()! } : {}) },
-      body: JSON.stringify({ embed_title: embedTitle, embed_description: embedDescription || null, embed_color: embedColor, embed_author: embedAuthor || null, embed_site_name: embedSiteName || null, embed_logo_url: embedLogoUrl || null, default_public: defaultPublic, custom_path: customPath || null, sharex_folder_name: sharexFolderName || "ShareX", sharex_url_mode: sharexUrlMode }),
+      body: JSON.stringify({ embed_title: embedTitle, embed_description: embedDescription || null, embed_color: embedColor, embed_author: embedAuthor || null, embed_site_name: embedSiteName || null, embed_logo_url: embedLogoUrl || null, default_public: defaultPublic, custom_path: customPath || null, sharex_folder_name: sharexFolderName || "ShareX", sharex_url_mode: sharexUrlMode, duplicate_handling: duplicateHandling }),
     });
     if (res.ok) { revalidator.revalidate(); toast({ title: "Settings saved!" }); }
     else { const d = await res.json(); toast({ title: "Error", description: d.error, variant: "destructive" }); }
@@ -173,6 +174,28 @@ export default function SettingsPage() {
             </button>
           </div>
           <p className="text-xs text-gray-600">What URL ShareX copies after upload — raw file or viewer page with embed</p>
+        </div>
+        <div className="space-y-2">
+          <label className="text-sm font-medium text-gray-400">Duplicate File Handling</label>
+          <div className="flex gap-2">
+            <button onClick={() => setDuplicateHandling("reject")}
+              className={`flex-1 py-2 text-sm font-medium rounded-lg transition-colors ${duplicateHandling === "reject" ? "bg-primary/20 text-primary border border-primary/30" : "bg-white/5 text-gray-400 border border-white/10 hover:bg-white/10"}`}>
+              <Icon name="block" className="text-base mr-1.5 align-middle" /> Reject
+            </button>
+            <button onClick={() => setDuplicateHandling("reuse")}
+              className={`flex-1 py-2 text-sm font-medium rounded-lg transition-colors ${duplicateHandling === "reuse" ? "bg-primary/20 text-primary border border-primary/30" : "bg-white/5 text-gray-400 border border-white/10 hover:bg-white/10"}`}>
+              <Icon name="link" className="text-base mr-1.5 align-middle" /> Reuse
+            </button>
+            <button onClick={() => setDuplicateHandling("allow")}
+              className={`flex-1 py-2 text-sm font-medium rounded-lg transition-colors ${duplicateHandling === "allow" ? "bg-primary/20 text-primary border border-primary/30" : "bg-white/5 text-gray-400 border border-white/10 hover:bg-white/10"}`}>
+              <Icon name="file_copy" className="text-base mr-1.5 align-middle" /> Allow
+            </button>
+          </div>
+          <p className="text-xs text-gray-600">
+            {duplicateHandling === "reject" && "Return error 409 when uploading identical files"}
+            {duplicateHandling === "reuse" && "Return existing file URL instead of uploading again"}
+            {duplicateHandling === "allow" && "Allow uploading duplicate files (creates new entries)"}
+          </p>
         </div>
         <button onClick={saveSettings} className="bg-primary hover:bg-[var(--primary-hover)] text-white px-6 py-2.5 rounded-xl font-bold shadow-glow-primary transition-all hover:scale-105">Save Settings</button>
       </section>

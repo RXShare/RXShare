@@ -64,9 +64,26 @@ export async function action({ request }: { request: Request }) {
   const fileHash = crypto.createHash("sha256").update(buffer).digest("hex");
 
   // Check for duplicates for the same user
+  const duplicateHandling = settings.duplicate_handling || "reject";
   const existing = queryOne<any>("SELECT * FROM uploads WHERE user_id = ? AND file_hash = ? AND deleted_at IS NULL", [user.id, fileHash]);
+  
   if (existing) {
-    return Response.json({ error: "Duplicate file", existingId: existing.id, existingName: existing.original_name }, { status: 409 });
+    if (duplicateHandling === "reject") {
+      return Response.json({ error: "Duplicate file", existingId: existing.id, existingName: existing.original_name }, { status: 409 });
+    } else if (duplicateHandling === "reuse") {
+      // Return existing file URL
+      const baseUrl = getBaseUrl(request);
+      return Response.json({
+        id: existing.id,
+        url: `${baseUrl}/v/${existing.file_name}`,
+        raw_url: `${baseUrl}/api/raw/${existing.file_name}`,
+        thumbnail_url: existing.thumbnail_path ? `${baseUrl}/api/files/${existing.thumbnail_path}` : null,
+        delete_url: `${baseUrl}/api/delete/${existing.id}`,
+        file_name: existing.file_name,
+        reused: true,
+      });
+    }
+    // If "allow", continue with upload
   }
 
   await storage.save(filePath, buffer);

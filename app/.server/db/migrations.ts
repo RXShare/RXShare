@@ -141,6 +141,8 @@ export function getMigrationUpdates(): string[] {
     "ALTER TABLE user_settings ADD COLUMN sharex_url_mode TEXT DEFAULT 'raw'",
     // Custom avatar
     "ALTER TABLE user_settings ADD COLUMN avatar_url TEXT",
+    // Duplicate file handling: reject (409), reuse (return existing), allow (upload anyway)
+    "ALTER TABLE user_settings ADD COLUMN duplicate_handling TEXT DEFAULT 'reject'",
   ];
 }
 
