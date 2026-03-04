@@ -14,6 +14,7 @@ export const links: LinksFunction = () => [
 export async function loader({ request }: { request: Request }) {
   const { initDatabaseAsync, isFirstRun, queryOne } = await import("~/.server/db");
   const { generateCsrfToken, getCsrfFromCookie } = await import("~/.server/csrf");
+  await import("~/.server/cleanup"); // Start cleanup jobs
   await initDatabaseAsync();
   const url = new URL(request.url);
   const path = url.pathname;

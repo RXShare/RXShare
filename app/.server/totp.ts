@@ -1,4 +1,4 @@
-import { authenticator } from "otplib";
+import { authenticator } from "@otplib/preset-default";
 import crypto from "crypto";
 import QRCode from "qrcode";
 import { queryOne, execute } from "./db";
