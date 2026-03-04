@@ -143,6 +143,10 @@ export function getMigrationUpdates(): string[] {
     "ALTER TABLE user_settings ADD COLUMN avatar_url TEXT",
     // Duplicate file handling: reject (409), reuse (return existing), allow (upload anyway)
     "ALTER TABLE user_settings ADD COLUMN duplicate_handling TEXT DEFAULT 'reject'",
+    // 2FA/MFA support
+    "ALTER TABLE users ADD COLUMN totp_secret TEXT",
+    "ALTER TABLE users ADD COLUMN totp_enabled INTEGER DEFAULT 0",
+    "ALTER TABLE users ADD COLUMN backup_codes TEXT",
   ];
 }
 
@@ -225,5 +229,15 @@ export function getNewTablesSQL(dbType: DbType): string[] {
       enabled ${intBool} NOT NULL DEFAULT 1,
       members_enabled ${intBool} NOT NULL DEFAULT 1
     )`,
+    // 2FA verification sessions (temporary codes during login)
+    `CREATE TABLE IF NOT EXISTS totp_sessions (
+      id ${textType} PRIMARY KEY,
+      user_id ${textType} NOT NULL,
+      expires_at ${autoTs},
+      created_at ${autoTs},
+      FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+    )`,
+    "CREATE INDEX IF NOT EXISTS idx_totp_sessions_user_id ON totp_sessions(user_id)",
+    "CREATE INDEX IF NOT EXISTS idx_totp_sessions_expires_at ON totp_sessions(expires_at)",
   ];
 }

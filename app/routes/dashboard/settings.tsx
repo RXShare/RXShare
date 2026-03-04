@@ -13,11 +13,12 @@ export async function loader({ request }: { request: Request }) {
   if (!session) throw new Response(null, { status: 302, headers: { Location: "/auth/login" } });
   const settings = queryOne<any>("SELECT * FROM user_settings WHERE user_id = ?", [session.user.id]);
   const tokens = query<any>("SELECT id, name, created_at, last_used_at FROM api_tokens WHERE user_id = ? ORDER BY created_at DESC", [session.user.id]);
-  return { settings, tokens };
+  const user = queryOne<any>("SELECT totp_enabled FROM users WHERE id = ?", [session.user.id]);
+  return { settings, tokens, totp_enabled: user?.totp_enabled === 1 };
 }
 
 export default function SettingsPage() {
-  const { settings, tokens } = useLoaderData<typeof loader>();
+  const { settings, tokens, totp_enabled } = useLoaderData<typeof loader>();
   const { user, systemSettings } = useOutletContext<any>();
   const { toast } = useToast();
   const revalidator = useRevalidator();
@@ -36,6 +37,13 @@ export default function SettingsPage() {
   const [tokenName, setTokenName] = useState("");
   const [newToken, setNewToken] = useState<string | null>(null);
   const [avatarUploading, setAvatarUploading] = useState(false);
+  
+  // 2FA state
+  const [totp2faEnabled, setTotp2faEnabled] = useState(false);
+  const [totp2faSetup, setTotp2faSetup] = useState<{ secret: string; qrCode: string; backupCodes: string[] } | null>(null);
+  const [totpVerifyCode, setTotpVerifyCode] = useState("");
+  const [totpDisableCode, setTotpDisableCode] = useState("");
+  const [showBackupCodes, setShowBackupCodes] = useState(false);
 
   const uploadAvatar = async (file: File) => {
     setAvatarUploading(true);
@@ -69,6 +77,59 @@ export default function SettingsPage() {
     const res = await fetch("/api/tokens", { method: "POST", headers: { "Content-Type": "application/json", ...(getCsrfToken() ? { "X-CSRF-Token": getCsrfToken()! } : {}) }, body: JSON.stringify({ name: tokenName.trim() }) });
     const data = await res.json();
     if (res.ok) { setNewToken(data.token); setTokenName(""); revalidator.revalidate(); toast({ title: "Token created! Copy it now." }); }
+  };
+
+  // 2FA functions
+  const start2faSetup = async () => {
+    const res = await fetch("/api/auth/totp/setup");
+    const data = await res.json();
+    if (res.ok) {
+      setTotp2faSetup(data);
+      setShowBackupCodes(false);
+    } else {
+      toast({ title: "Error", description: data.error, variant: "destructive" });
+    }
+  };
+
+  const enable2fa = async () => {
+    if (!totpVerifyCode.trim() || !totp2faSetup) {
+      toast({ title: "Enter verification code", variant: "destructive" });
+      return;
+    }
+    const res = await fetch("/api/auth/totp/enable", {
+      method: "POST",
+      headers: { "Content-Type": "application/json", ...(getCsrfToken() ? { "X-CSRF-Token": getCsrfToken()! } : {}) },
+      body: JSON.stringify({ secret: totp2faSetup.secret, token: totpVerifyCode, backupCodes: totp2faSetup.backupCodes }),
+    });
+    if (res.ok) {
+      toast({ title: "2FA enabled successfully!" });
+      setTotp2faSetup(null);
+      setTotpVerifyCode("");
+      revalidator.revalidate();
+    } else {
+      const data = await res.json();
+      toast({ title: "Error", description: data.error, variant: "destructive" });
+    }
+  };
+
+  const disable2fa = async () => {
+    if (!totpDisableCode.trim()) {
+      toast({ title: "Enter verification code", variant: "destructive" });
+      return;
+    }
+    const res = await fetch("/api/auth/totp/disable", {
+      method: "POST",
+      headers: { "Content-Type": "application/json", ...(getCsrfToken() ? { "X-CSRF-Token": getCsrfToken()! } : {}) },
+      body: JSON.stringify({ token: totpDisableCode }),
+    });
+    if (res.ok) {
+      toast({ title: "2FA disabled" });
+      setTotpDisableCode("");
+      revalidator.revalidate();
+    } else {
+      const data = await res.json();
+      toast({ title: "Error", description: data.error, variant: "destructive" });
+    }
   };
 
   const deleteToken = async (id: string) => {
@@ -198,6 +259,100 @@ export default function SettingsPage() {
           </p>
         </div>
         <button onClick={saveSettings} className="bg-primary hover:bg-[var(--primary-hover)] text-white px-6 py-2.5 rounded-xl font-bold shadow-glow-primary transition-all hover:scale-105">Save Settings</button>
+      </section>
+
+      {/* Two-Factor Authentication */}
+      <section className="bg-[#141414] border border-white/5 rounded-2xl p-8 shadow-glow-card space-y-6">
+        <h3 className="text-xl font-bold text-white flex items-center gap-2"><span className="w-1 h-6 bg-primary rounded-full" /><Icon name="security" className="text-xl" /> Two-Factor Authentication</h3>
+        <p className="text-sm text-gray-500 -mt-4">Add an extra layer of security to your account</p>
+        
+        {!totp_enabled && !totp2faSetup && (
+          <div className="space-y-4">
+            <p className="text-sm text-gray-400">Protect your account with time-based one-time passwords (TOTP) using apps like Google Authenticator, Authy, or 1Password.</p>
+            <button onClick={start2faSetup} className="bg-primary hover:bg-[var(--primary-hover)] text-white px-6 py-2.5 rounded-xl font-bold shadow-glow-primary transition-all hover:scale-105 flex items-center gap-2">
+              <Icon name="add" className="text-lg" /> Enable 2FA
+            </button>
+          </div>
+        )}
+
+        {totp2faSetup && (
+          <div className="space-y-6">
+            <div className="bg-white/[0.03] border border-white/5 rounded-xl p-6 space-y-4">
+              <p className="text-sm font-medium text-white">Step 1: Scan QR Code</p>
+              <p className="text-xs text-gray-500">Scan this QR code with your authenticator app</p>
+              <div className="flex justify-center">
+                <img src={totp2faSetup.qrCode} alt="2FA QR Code" className="w-48 h-48 rounded-lg border border-white/10" />
+              </div>
+              <p className="text-xs text-gray-500 text-center">Or enter this secret manually:</p>
+              <code className="block text-xs bg-[#0a0a0a] text-gray-300 p-3 rounded-lg text-center font-mono border border-white/10">{totp2faSetup.secret}</code>
+            </div>
+
+            <div className="bg-white/[0.03] border border-white/5 rounded-xl p-6 space-y-4">
+              <p className="text-sm font-medium text-white">Step 2: Save Backup Codes</p>
+              <p className="text-xs text-gray-500">Save these codes in a safe place. You can use them to access your account if you lose your device.</p>
+              {!showBackupCodes ? (
+                <button onClick={() => setShowBackupCodes(true)} className="text-sm text-primary hover:text-primary/80 transition-colors">
+                  Show backup codes
+                </button>
+              ) : (
+                <div className="grid grid-cols-2 gap-2">
+                  {totp2faSetup.backupCodes.map((code, i) => (
+                    <code key={i} className="text-xs bg-[#0a0a0a] text-gray-300 p-2 rounded-lg text-center font-mono border border-white/10">{code}</code>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            <div className="space-y-2">
+              <label className="text-sm font-medium text-gray-400">Step 3: Verify Code</label>
+              <p className="text-xs text-gray-500">Enter the 6-digit code from your authenticator app</p>
+              <input
+                value={totpVerifyCode}
+                onChange={(e) => setTotpVerifyCode(e.target.value.replace(/\D/g, "").slice(0, 6))}
+                placeholder="000000"
+                className={inputCls + " text-center text-2xl tracking-widest font-mono"}
+                maxLength={6}
+              />
+            </div>
+
+            <div className="flex gap-2">
+              <button onClick={enable2fa} disabled={totpVerifyCode.length !== 6} className="bg-primary hover:bg-[var(--primary-hover)] text-white px-6 py-2.5 rounded-xl font-bold shadow-glow-primary transition-all hover:scale-105 disabled:opacity-50 disabled:cursor-not-allowed">
+                Enable 2FA
+              </button>
+              <button onClick={() => { setTotp2faSetup(null); setTotpVerifyCode(""); }} className="px-6 py-2.5 text-sm text-gray-400 hover:text-white bg-white/5 hover:bg-white/10 border border-white/10 rounded-xl transition-colors">
+                Cancel
+              </button>
+            </div>
+          </div>
+        )}
+
+        {totp_enabled && !totp2faSetup && (
+          <div className="space-y-4">
+            <div className="flex items-center gap-3 p-4 bg-green-500/10 border border-green-500/20 rounded-xl">
+              <Icon name="check_circle" className="text-green-400 text-2xl" />
+              <div>
+                <p className="text-sm font-medium text-green-400">2FA is enabled</p>
+                <p className="text-xs text-gray-500">Your account is protected with two-factor authentication</p>
+              </div>
+            </div>
+            
+            <div className="space-y-2">
+              <label className="text-sm font-medium text-gray-400">Disable 2FA</label>
+              <p className="text-xs text-gray-500">Enter a verification code from your authenticator app to disable 2FA</p>
+              <input
+                value={totpDisableCode}
+                onChange={(e) => setTotpDisableCode(e.target.value.replace(/\D/g, "").slice(0, 6))}
+                placeholder="000000"
+                className={inputCls + " text-center text-xl tracking-widest font-mono"}
+                maxLength={6}
+              />
+            </div>
+
+            <button onClick={disable2fa} disabled={totpDisableCode.length !== 6} className="bg-red-500 hover:bg-red-600 text-white px-6 py-2.5 rounded-xl font-bold transition-all hover:scale-105 disabled:opacity-50 disabled:cursor-not-allowed">
+              Disable 2FA
+            </button>
+          </div>
+        )}
       </section>
 
       {/* API Tokens */}
