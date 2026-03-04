@@ -1,7 +1,8 @@
 import { nanoid } from "nanoid";
 import { queryOne, execute } from "~/.server/db";
 import { verifyTotpToken, verifyBackupCode, getTotpSecret } from "~/.server/totp";
-import { createSession } from "~/.server/session";
+import { generateToken } from "~/.server/auth";
+import { createSessionHeaders } from "~/.server/session";
 import { validateCsrf } from "~/.server/csrf";
 import { logAudit, getClientIp } from "~/.server/audit";
 
@@ -15,9 +16,9 @@ export async function action({ request }: { request: Request }) {
   if (csrfError) return csrfError;
 
   const body = await request.json();
-  const { sessionId, token, useBackupCode } = body;
+  const { sessionId, token: userToken, useBackupCode } = body;
 
-  if (!sessionId || !token) {
+  if (!sessionId || !userToken) {
     return Response.json({ error: "Missing required fields" }, { status: 400 });
   }
 
@@ -42,14 +43,14 @@ export async function action({ request }: { request: Request }) {
 
   if (useBackupCode) {
     // Verify backup code
-    verified = verifyBackupCode(userId, token);
+    verified = verifyBackupCode(userId, userToken);
   } else {
     // Verify TOTP token
     const secret = getTotpSecret(userId);
     if (!secret) {
       return Response.json({ error: "2FA not configured" }, { status: 400 });
     }
-    verified = verifyTotpToken(secret, token);
+    verified = verifyTotpToken(secret, userToken);
   }
 
   if (!verified) {
@@ -69,12 +70,13 @@ export async function action({ request }: { request: Request }) {
   execute("UPDATE users SET last_sign_in_at = ? WHERE id = ?", [new Date().toISOString(), userId]);
 
   // Create real session
-  const { cookie } = await createSession(user);
-  logAudit("login.2fa", { userId, ip: getClientIp(request) });
+  const sessionToken = generateToken(userId);
+  const headers = await createSessionHeaders(sessionToken);
+  logAudit("login", { userId, ip: getClientIp(request) });
 
   return new Response(JSON.stringify({ ok: true }), {
     headers: {
-      "Set-Cookie": cookie,
+      ...headers,
       "Content-Type": "application/json",
     },
   });
