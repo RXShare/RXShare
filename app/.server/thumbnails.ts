@@ -6,7 +6,7 @@ export async function generateThumbnail(filePath: string, mimeType: string): Pro
   try {
     const storage = await getStorage();
     const data = await storage.read(filePath);
-    const thumb = await sharp(data).resize(300, 300, { fit: "inside" }).webp({ quality: 75 }).toBuffer();
+    const thumb = await sharp(data).resize(300, 300, { fit: "inside", withoutEnlargement: true }).webp({ quality: 75 }).toBuffer();
     const thumbPath = filePath.replace(/\.[^.]+$/, "_thumb.webp");
     await storage.save(thumbPath, thumb);
     return thumbPath;
@@ -20,7 +20,7 @@ export async function generatePreview(filePath: string, mimeType: string): Promi
   try {
     const storage = await getStorage();
     const data = await storage.read(filePath);
-    const preview = await sharp(data).resize(1200, 630, { fit: "inside" }).webp({ quality: 80 }).toBuffer();
+    const preview = await sharp(data).resize(1200, 630, { fit: "cover", position: "center" }).webp({ quality: 80 }).toBuffer();
     const previewPath = filePath.replace(/\.[^.]+$/, "_preview.webp");
     await storage.save(previewPath, preview);
     return previewPath;
@@ -44,8 +44,8 @@ export async function generateThumbnails(filePath: string, mimeType: string): Pr
 
     // Run both sharp operations in parallel from the same buffer
     const [thumbResult, previewResult] = await Promise.allSettled([
-      sharp(data).resize(300, 300, { fit: "inside" }).webp({ quality: 75 }).toBuffer(),
-      sharp(data).resize(1200, 630, { fit: "inside" }).webp({ quality: 80 }).toBuffer(),
+      sharp(data).resize(300, 300, { fit: "inside", withoutEnlargement: true }).webp({ quality: 75 }).toBuffer(),
+      sharp(data).resize(1200, 630, { fit: "cover", position: "center" }).webp({ quality: 80 }).toBuffer(),
     ]);
 
     if (thumbResult.status === "fulfilled") {
