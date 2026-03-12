@@ -90,8 +90,6 @@ export function meta({ data }: { data: any }) {
     ...(author ? [{ property: "article:author", content: author }] : []),
     ...(ogImage ? [
       { property: "og:image", content: ogImage },
-      { property: "og:image:width", content: "1200" },
-      { property: "og:image:height", content: "630" },
     ] : []),
     ...(upload.embed_logo_url ? [{ property: "og:image:alt", content: siteName }] : []),
     { property: "og:type", content: isImage ? "image" : "website" },
