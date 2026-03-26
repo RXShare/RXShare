@@ -1,6 +1,6 @@
 # RXShare
 
-Self-hosted file sharing. Upload stuff, get links, share them. Dark UI with glass effects because why not.
+Self-hosted file sharing. Upload stuff, get links, share them.
 
 > ⚠️ **Beta** — This is still in active development. Things might break, data might vanish, dragons might appear. Don't run this in production unless you're okay with that. Back up your data.
 
@@ -75,4 +75,4 @@ React Router 7 (SSR), TypeScript, Tailwind CSS 4, SQLite/MySQL, Sharp for image 
 
 ## License
 
-[GPL-3.0](LICENSE)
+[AGPL-3.0](LICENSE)
