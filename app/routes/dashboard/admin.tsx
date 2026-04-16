@@ -9,6 +9,7 @@ import { useToast } from "~/components/ui/use-toast";
 import { Icon } from "~/components/Icon";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "~/components/ui/dialog";
 import { Switch } from "~/components/ui/switch";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "~/components/ui/select";
 import { getCsrfToken } from "~/lib/csrf";
 
 export async function loader({ request }: { request: Request }) {
@@ -831,14 +832,18 @@ function AnalyticsTab({ users, allUploads }: { users: any[]; allUploads: any[] }
 
   const rangeLabels: Record<string, string> = { day: "Today", week: "This Week", month: "This Month", lifetime: "All Time" };
   const rangeLabel = rangeLabels[range] || "This Month";
-  const RangeDropdown = ({ value, onChange }: { value: string; onChange: (v: string) => void }) => (
-    <select value={value} onChange={(e) => onChange(e.target.value)}
-      className="text-xs bg-[#0a0a0a] border border-white/10 rounded-lg px-2 py-1.5 text-gray-400 focus:outline-none focus:ring-1 focus:ring-primary cursor-pointer">
-      <option value="day">Today</option>
-      <option value="week">This Week</option>
-      <option value="month">This Month</option>
-      <option value="lifetime">All Time</option>
-    </select>
+  const RangeDropdown = () => (
+    <Select value={range} onValueChange={handleRangeChange}>
+      <SelectTrigger className="w-auto h-auto gap-1.5 px-2.5 py-1 text-xs bg-white/5 border-white/10 text-gray-400 rounded-lg hover:bg-white/10 hover:text-white transition-colors">
+        <SelectValue />
+      </SelectTrigger>
+      <SelectContent className="bg-[#1a1a1a] border-white/10">
+        <SelectItem value="day" className="text-xs text-gray-300 focus:bg-white/10 focus:text-white">Today</SelectItem>
+        <SelectItem value="week" className="text-xs text-gray-300 focus:bg-white/10 focus:text-white">This Week</SelectItem>
+        <SelectItem value="month" className="text-xs text-gray-300 focus:bg-white/10 focus:text-white">This Month</SelectItem>
+        <SelectItem value="lifetime" className="text-xs text-gray-300 focus:bg-white/10 focus:text-white">All Time</SelectItem>
+      </SelectContent>
+    </Select>
   );
 
   const totalUsers = users.length;
@@ -876,11 +881,9 @@ function AnalyticsTab({ users, allUploads }: { users: any[]; allUploads: any[] }
         ].map((stat) => (
           <div key={stat.label} className="bg-[#141414]/50 backdrop-blur-md border border-white/5 p-6 rounded-2xl relative overflow-hidden group hover:border-primary/30 transition-all duration-300 shadow-glow-card">
             <div className="absolute top-0 right-0 p-4 opacity-10 group-hover:opacity-20 transition-opacity"><Icon name={stat.icon} className={cn("text-6xl", stat.color)} /></div>
-            <div className="flex items-center justify-between mb-2">
-              <span className="text-gray-400 text-sm font-medium">{stat.label}</span>
-              <span className="text-[10px] text-gray-500 bg-white/5 px-2 py-0.5 rounded-full">{rangeLabel}</span>
-            </div>
+            <div className="text-gray-400 text-sm font-medium mb-2">{stat.label}</div>
             <div className="text-3xl font-bold text-white tracking-tight">{stat.value}</div>
+            <div className="absolute bottom-3 right-3"><span className="text-[10px] text-gray-500 bg-white/5 px-2 py-0.5 rounded-full">{rangeLabel}</span></div>
           </div>
         ))}
       </div>
