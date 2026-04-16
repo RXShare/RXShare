@@ -115,7 +115,7 @@ echo -e "    ${CYAN}1)${NC} Public  — Cloudflare Tunnel (no ports exposed, HTT
 echo -e "    ${CYAN}2)${NC} Local   — localhost only (127.0.0.1:6910)"
 echo -e "    ${CYAN}3)${NC} Open    — all interfaces (0.0.0.0:6910) ${YELLOW}← use with firewall${NC}"
 echo ""
-read -rp "  Choose [1/2/3] (default: 1): " NETWORK_MODE
+read -rp "  Choose [1/2/3] (default: 1): " NETWORK_MODE < /dev/tty
 NETWORK_MODE="${NETWORK_MODE:-1}"
 
 # --- Write docker-compose.yml ---
@@ -172,7 +172,7 @@ YAML
     echo -e "  ${CYAN}Get one at:${NC} https://one.dash.cloudflare.com → Networks → Tunnels → Create"
     echo -e "  ${CYAN}Set the service to:${NC} ${BOLD}http://rxshare:3000${NC}"
     echo ""
-    read -rp "  Paste your Cloudflare Tunnel token: " CF_TOKEN
+    read -rp "  Paste your Cloudflare Tunnel token: " CF_TOKEN < /dev/tty
     if [ -z "$CF_TOKEN" ]; then
       fail "Tunnel token is required for Cloudflare mode"
     fi
