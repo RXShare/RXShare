@@ -154,6 +154,8 @@ export function getMigrationUpdates(): string[] {
     "ALTER TABLE system_settings ADD COLUMN captcha_on_login INTEGER DEFAULT 0",
     "ALTER TABLE system_settings ADD COLUMN captcha_on_signup INTEGER DEFAULT 0",
     "ALTER TABLE system_settings ADD COLUMN captcha_on_upload INTEGER DEFAULT 0",
+    // Powered by badge
+    "ALTER TABLE system_settings ADD COLUMN show_powered_by INTEGER DEFAULT 1",
   ];
 }
 

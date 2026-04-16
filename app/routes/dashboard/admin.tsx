@@ -304,6 +304,7 @@ function SettingsTab({ systemSettings, toast, revalidator }: any) {
   const [baseUrl, setBaseUrl] = useState(systemSettings?.base_url || "");
   const [allowReg, setAllowReg] = useState(systemSettings?.allow_registration !== 0);
   const [allowLogin, setAllowLogin] = useState(systemSettings?.allow_login !== 0);
+  const [showPoweredBy, setShowPoweredBy] = useState(systemSettings?.show_powered_by !== 0);
   const [defaultQuota, setDefaultQuota] = useState(String(Math.round((systemSettings?.default_quota || 1073741824) / 1024 / 1024)));
   const [maxUpload, setMaxUpload] = useState(String(Math.round((systemSettings?.max_upload_size || 104857600) / 1024 / 1024)));
 
@@ -314,6 +315,7 @@ function SettingsTab({ systemSettings, toast, revalidator }: any) {
         site_name: siteName, site_description: siteDesc, base_url: baseUrl || null,
         allow_registration: allowReg ? 1 : 0, allow_login: allowLogin ? 1 : 0,
         default_quota: parseInt(defaultQuota) * 1024 * 1024, max_upload_size: parseInt(maxUpload) * 1024 * 1024,
+        show_powered_by: showPoweredBy ? 1 : 0,
       }),
     });
     if (res.ok) { revalidator.revalidate(); toast({ title: "Settings saved!" }); }
@@ -336,6 +338,10 @@ function SettingsTab({ systemSettings, toast, revalidator }: any) {
         <div className="flex items-center justify-between">
           <div><p className="text-sm font-medium text-white">Allow Login</p><p className="text-xs text-gray-500">Enable/disable login page</p></div>
           <Switch checked={allowLogin} onCheckedChange={setAllowLogin} />
+        </div>
+        <div className="flex items-center justify-between">
+          <div><p className="text-sm font-medium text-white">Show "Powered by RXShare"</p><p className="text-xs text-gray-500">Display credit badge on viewer pages</p></div>
+          <Switch checked={showPoweredBy} onCheckedChange={setShowPoweredBy} />
         </div>
         <div className="h-px bg-white/5" />
         <div className="space-y-2"><label className="text-sm font-medium text-gray-400">Default Quota (MB)</label><input type="number" value={defaultQuota} onChange={(e) => setDefaultQuota(e.target.value)} className={inputCls} /><p className="text-xs text-gray-600">{formatFileSize(parseInt(defaultQuota || "0") * 1024 * 1024)}</p></div>

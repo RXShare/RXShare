@@ -55,8 +55,8 @@ export async function loader({ params, request }: { params: { fileName: string }
   }
 
   const baseUrl = getBaseUrl(request);
-  const sys = queryOne<any>("SELECT primary_color, background_pattern FROM system_settings LIMIT 1");
-  const data = { upload, baseUrl, primaryColor: sys?.primary_color || null, backgroundPattern: sys?.background_pattern || "grid" };
+  const sys = queryOne<any>("SELECT primary_color, background_pattern, show_powered_by FROM system_settings LIMIT 1");
+  const data = { upload, baseUrl, primaryColor: sys?.primary_color || null, backgroundPattern: sys?.background_pattern || "grid", showPoweredBy: sys?.show_powered_by !== 0 };
 
   if (setCookieHeader) {
     return new Response(JSON.stringify(data), {
@@ -111,7 +111,7 @@ export default function Viewer() {
     return <PasswordGate fileName={data.fileName} originalName={data.originalName} backgroundPattern={data.backgroundPattern} />;
   }
 
-  const { upload, backgroundPattern } = data;
+  const { upload, backgroundPattern, showPoweredBy } = data;
   const category = getMimeCategory(upload.mime_type);
   const fileUrl = `/api/files/${upload.file_path}`;
   const patClass = `bg-pattern-${backgroundPattern}`;
@@ -219,6 +219,17 @@ export default function Viewer() {
           </div>
         </div>
       </div>
+
+      {/* Powered by badge */}
+      {showPoweredBy && (
+        <div className="relative z-10 py-4 text-center">
+          <a href="https://github.com/RXShare/RXShare" target="_blank" rel="noopener noreferrer"
+            className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs text-gray-500 hover:text-gray-300 bg-white/5 hover:bg-white/10 border border-white/5 rounded-full transition-all">
+            <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"/></svg>
+            Powered by RXShare
+          </a>
+        </div>
+      )}
 
     </div>
   );
