@@ -108,15 +108,28 @@ else
 fi
 
 # --- Network mode selection ---
-echo ""
-echo -e "  ${BOLD}How do you want to expose RXShare?${NC}"
-echo ""
-echo -e "    ${CYAN}1)${NC} Public  — Cloudflare Tunnel (no ports exposed, HTTPS automatic)"
-echo -e "    ${CYAN}2)${NC} Local   — localhost only (127.0.0.1:6910)"
-echo -e "    ${CYAN}3)${NC} Open    — all interfaces (0.0.0.0:6910) ${YELLOW}← use with firewall${NC}"
-echo ""
-read -rp "  Choose [1/2/3] (default: 1): " NETWORK_MODE < /dev/tty
-NETWORK_MODE="${NETWORK_MODE:-1}"
+# Can be set via env: RXSHARE_MODE=1|2|3 or passed after the install dir
+# 1=Cloudflare Tunnel, 2=Local only, 3=Open (default when non-interactive)
+NETWORK_MODE="${RXSHARE_MODE:-}"
+
+if [ -z "$NETWORK_MODE" ]; then
+  # Try interactive prompt
+  if [ -t 0 ] || [ -e /dev/tty ]; then
+    echo ""
+    echo -e "  ${BOLD}How do you want to expose RXShare?${NC}"
+    echo ""
+    echo -e "    ${CYAN}1)${NC} Public  — Cloudflare Tunnel (no ports exposed, HTTPS automatic)"
+    echo -e "    ${CYAN}2)${NC} Local   — localhost only (127.0.0.1:6910)"
+    echo -e "    ${CYAN}3)${NC} Open    — all interfaces (0.0.0.0:6910) ${YELLOW}← use with firewall${NC}"
+    echo ""
+    NETWORK_MODE=$(bash -c 'read -rp "  Choose [1/2/3] (default: 3): " m < /dev/tty 2>/dev/null; echo "$m"' 2>/dev/null) || true
+    NETWORK_MODE="${NETWORK_MODE:-3}"
+  else
+    warn "Non-interactive shell detected, defaulting to open mode (0.0.0.0:6910)"
+    warn "Set RXSHARE_MODE=1|2|3 to choose, or run the script directly"
+    NETWORK_MODE="3"
+  fi
+fi
 
 # --- Write docker-compose.yml ---
 COMPOSE_FILE="$INSTALL_DIR/docker-compose.yml"
@@ -167,14 +180,17 @@ YAML
     ;;
   *)
     # Cloudflare Tunnel (no ports exposed to host)
-    echo ""
-    info "Cloudflare Tunnel requires a tunnel token."
-    echo -e "  ${CYAN}Get one at:${NC} https://one.dash.cloudflare.com → Networks → Tunnels → Create"
-    echo -e "  ${CYAN}Set the service to:${NC} ${BOLD}http://rxshare:3000${NC}"
-    echo ""
-    read -rp "  Paste your Cloudflare Tunnel token: " CF_TOKEN < /dev/tty
+    CF_TOKEN="${CF_TUNNEL_TOKEN:-}"
     if [ -z "$CF_TOKEN" ]; then
-      fail "Tunnel token is required for Cloudflare mode"
+      echo ""
+      info "Cloudflare Tunnel requires a tunnel token."
+      echo -e "  ${CYAN}Get one at:${NC} https://one.dash.cloudflare.com → Networks → Tunnels → Create"
+      echo -e "  ${CYAN}Set the service to:${NC} ${BOLD}http://rxshare:3000${NC}"
+      echo ""
+      CF_TOKEN=$(bash -c 'read -rp "  Paste your Cloudflare Tunnel token: " t < /dev/tty 2>/dev/null; echo "$t"' 2>/dev/null) || true
+    fi
+    if [ -z "$CF_TOKEN" ]; then
+      fail "Tunnel token is required. Set CF_TUNNEL_TOKEN env var or run interactively."
     fi
 
     cat > "$COMPOSE_FILE" <<YAML
