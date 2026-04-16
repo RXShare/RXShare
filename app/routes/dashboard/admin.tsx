@@ -15,7 +15,7 @@ import { getCsrfToken } from "~/lib/csrf";
 export async function loader({ request }: { request: Request }) {
   const session = await getSession(request);
   if (!session || !isAdmin(session.user.id)) throw new Response(null, { status: 302, headers: { Location: "/dashboard" } });
-  const users = query<any>("SELECT u.*, us.disk_quota, us.disk_used, us.is_admin, us.is_active, us.max_upload_size, us.avatar_url FROM users u LEFT JOIN user_settings us ON u.id = us.user_id ORDER BY u.created_at");
+  const users = query<any>("SELECT u.*, us.disk_quota, us.disk_used, us.is_admin, us.is_active, us.max_upload_size, us.avatar_url, us.invite_quota, us.invites_used FROM users u LEFT JOIN user_settings us ON u.id = us.user_id ORDER BY u.created_at");
   const allUploads = query<any>("SELECT id, user_id, file_size FROM uploads");
   const systemSettings = queryOne<any>("SELECT * FROM system_settings LIMIT 1");
   return { users, allUploads, systemSettings, currentUserId: session.user.id };
@@ -74,7 +74,7 @@ export default function AdminPage() {
       {activeTab === "design" && <DesignTab systemSettings={systemSettings} toast={toast} revalidator={revalidator} />}
       {activeTab === "audit" && <AuditTab toast={toast} />}
       {activeTab === "webhooks" && <WebhooksTab toast={toast} />}
-      {activeTab === "invites" && <InvitesTab toast={toast} systemSettings={systemSettings} />}
+      {activeTab === "invites" && <InvitesTab toast={toast} systemSettings={systemSettings} users={users} revalidator={revalidator} />}
       {activeTab === "features" && <FeaturesTab toast={toast} />}
     </div>
   );
@@ -86,6 +86,7 @@ function UsersTab({ users, allUploads, currentUserId, toast, revalidator }: any)
   const [editUser, setEditUser] = useState<any>(null);
   const [editQuota, setEditQuota] = useState("");
   const [editMaxUpload, setEditMaxUpload] = useState("");
+  const [editInviteQuota, setEditInviteQuota] = useState("");
   const [showCreate, setShowCreate] = useState(false);
   const [createEmail, setCreateEmail] = useState("");
   const [createUsername, setCreateUsername] = useState("");
@@ -123,6 +124,7 @@ function UsersTab({ users, allUploads, currentUserId, toast, revalidator }: any)
     const updates: any = {};
     if (editQuota) updates.disk_quota = parseInt(editQuota) * 1024 * 1024;
     if (editMaxUpload) updates.max_upload_size = parseInt(editMaxUpload) * 1024 * 1024;
+    if (editInviteQuota !== "") updates.invite_quota = parseInt(editInviteQuota) || 0;
     const res = await fetch(`/api/admin/users/${editUser.id}`, { method: "PATCH", headers: { "Content-Type": "application/json", ...(getCsrfToken() ? { "X-CSRF-Token": getCsrfToken()! } : {}) }, body: JSON.stringify(updates) });
     if (res.ok) { setEditUser(null); revalidator.revalidate(); toast({ title: "User settings updated" }); }
   };
@@ -220,7 +222,7 @@ function UsersTab({ users, allUploads, currentUserId, toast, revalidator }: any)
                   </td>
                   <td className="px-6 py-4 text-right">
                     <div className="flex items-center justify-end gap-1">
-                      <button onClick={() => { setEditUser(u); setEditQuota(String(Math.round((u.disk_quota || 0) / 1024 / 1024))); setEditMaxUpload(String(Math.round((u.max_upload_size || 0) / 1024 / 1024))); }}
+                      <button onClick={() => { setEditUser(u); setEditQuota(String(Math.round((u.disk_quota || 0) / 1024 / 1024))); setEditMaxUpload(String(Math.round((u.max_upload_size || 0) / 1024 / 1024))); setEditInviteQuota(String(u.invite_quota || 0)); }}
                         className="p-2 text-gray-500 hover:text-white hover:bg-white/10 rounded-lg transition-all"><Icon name="edit" /></button>
                       {!isSelf && (
                         <>
@@ -267,6 +269,13 @@ function UsersTab({ users, allUploads, currentUserId, toast, revalidator }: any)
           <div className="space-y-4">
             <div className="space-y-2"><label className="text-sm font-medium text-gray-400">Disk Quota (MB)</label><input type="number" value={editQuota} onChange={(e) => setEditQuota(e.target.value)} className={inputCls} /></div>
             <div className="space-y-2"><label className="text-sm font-medium text-gray-400">Max Upload Size (MB)</label><input type="number" value={editMaxUpload} onChange={(e) => setEditMaxUpload(e.target.value)} className={inputCls} /></div>
+            {editUser?.id !== currentUserId && (
+              <div className="space-y-2">
+                <label className="text-sm font-medium text-gray-400">Invite Quota</label>
+                <input type="number" value={editInviteQuota} onChange={(e) => setEditInviteQuota(e.target.value)} className={inputCls} placeholder="0" />
+                <p className="text-xs text-gray-600">How many invites this user can create. 0 = none.</p>
+              </div>
+            )}
           </div>
           <DialogFooter>
             <button onClick={() => setEditUser(null)} className="px-4 py-2 text-sm text-gray-400 border border-white/10 rounded-lg hover:bg-white/5 transition-colors">Cancel</button>
@@ -358,6 +367,7 @@ function DesignTab({ systemSettings, toast, revalidator }: any) {
   const [primaryColor, setPrimaryColor] = useState(systemSettings?.primary_color || "#f97316");
   const [bgPattern, setBgPattern] = useState(systemSettings?.background_pattern || "grid");
   const [uploading, setUploading] = useState(false);
+  const [userControlledLayout, setUserControlledLayout] = useState(systemSettings?.user_controlled_layout === 1);
 
   const layouts = [
     { id: "header", label: "Header Layout", icon: "monitor", desc: "Navigation on top" },
@@ -396,7 +406,7 @@ function DesignTab({ systemSettings, toast, revalidator }: any) {
   const save = async () => {
     const res = await fetch("/api/admin/system-settings", {
       method: "PUT", headers: { "Content-Type": "application/json", ...(getCsrfToken() ? { "X-CSRF-Token": getCsrfToken()! } : {}) },
-      body: JSON.stringify({ dashboard_layout: layout, logo_url: logoUrl || null, primary_color: primaryColor, background_pattern: bgPattern }),
+      body: JSON.stringify({ dashboard_layout: layout, logo_url: logoUrl || null, primary_color: primaryColor, background_pattern: bgPattern, user_controlled_layout: userControlledLayout ? 1 : 0 }),
     });
     if (res.ok) { revalidator.revalidate(); toast({ title: "Design saved! Reload to see changes." }); }
   };
@@ -411,7 +421,17 @@ function DesignTab({ systemSettings, toast, revalidator }: any) {
           <h3 className="text-xl font-bold text-white flex items-center gap-2"><span className="w-1 h-6 bg-primary rounded-full" /> Dashboard Layout</h3>
           <span className="text-xs text-gray-500 bg-white/5 px-2 py-1 rounded">Visual Config</span>
         </div>
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+        <div className="flex items-center justify-between mb-6 p-4 bg-white/[0.03] border border-white/5 rounded-xl">
+          <div><p className="text-sm font-medium text-white">User-Controlled Layout</p><p className="text-xs text-gray-500">Let each user pick their own dashboard layout</p></div>
+          <Switch checked={userControlledLayout} onCheckedChange={setUserControlledLayout} />
+        </div>
+        {userControlledLayout && (
+          <div className="mb-6 p-3 bg-yellow-500/10 border border-yellow-500/20 rounded-xl flex items-center gap-2">
+            <Icon name="info" className="text-yellow-400 text-lg shrink-0" />
+            <p className="text-xs text-yellow-400/80">Users control their own layout. The selection below is the default for new users.</p>
+          </div>
+        )}
+        <div className={cn("grid grid-cols-1 md:grid-cols-3 gap-6", userControlledLayout && "opacity-50 pointer-events-none")}>
           {layouts.map((l) => (
             <label key={l.id} className="cursor-pointer group relative">
               <input type="radio" name="layout" className="peer sr-only" checked={layout === l.id} onChange={() => setLayout(l.id)} />
@@ -654,10 +674,11 @@ function WebhooksTab({ toast }: any) {
   );
 }
 
-function InvitesTab({ toast, systemSettings }: any) {
+function InvitesTab({ toast, systemSettings, users, revalidator }: any) {
   const [invites, setInvites] = useState<any[]>([]);
   const [maxUses, setMaxUses] = useState("1");
   const [expiresHours, setExpiresHours] = useState("72");
+  const [bulkQuota, setBulkQuota] = useState("5");
 
   useEffect(() => {
     fetch("/api/admin/invites").then(r => r.json()).then(d => setInvites(d.invites || [])).catch(() => {});
@@ -728,6 +749,60 @@ function InvitesTab({ toast, systemSettings }: any) {
           })}
         </section>
       )}
+
+      {/* Per-user invite quotas */}
+      <section className="bg-[#141414] border border-white/5 rounded-2xl p-8 shadow-glow-card space-y-6">
+        <h3 className="text-xl font-bold text-white flex items-center gap-2"><span className="w-1 h-6 bg-primary rounded-full" /> User Invite Quotas</h3>
+        <p className="text-sm text-gray-500 -mt-4">Give users their own invite allowance. They can generate invites from their settings page.</p>
+        
+        <div className="flex items-center gap-3">
+          <input type="number" value={bulkQuota} onChange={(e) => setBulkQuota(e.target.value)} className={inputCls + " w-24"} min="0" />
+          <button onClick={async () => {
+            const quota = parseInt(bulkQuota) || 0;
+            for (const u of users) {
+              await fetch(`/api/admin/users/${u.id}`, { method: "PATCH", headers: { "Content-Type": "application/json", ...(getCsrfToken() ? { "X-CSRF-Token": getCsrfToken()! } : {}) }, body: JSON.stringify({ invite_quota: quota }) });
+            }
+            revalidator.revalidate();
+            toast({ title: `Set ${quota} invites for all users` });
+          }} className="bg-primary hover:bg-[var(--primary-hover)] text-white px-4 py-2.5 rounded-lg text-sm font-bold transition-all shadow-glow-primary flex items-center gap-2">
+            <Icon name="group" className="text-lg" /> Set for All Users
+          </button>
+        </div>
+
+        <div className="space-y-2">
+          {users.map((u: any) => (
+            <div key={u.id} className="flex items-center justify-between p-3 bg-white/[0.03] border border-white/5 rounded-xl">
+              <div className="flex items-center gap-3">
+                <div className="w-8 h-8 rounded-full bg-gray-800 flex items-center justify-center overflow-hidden">
+                  <img alt="" className="w-full h-full object-cover" src={getAvatarUrl(u.username || u.email, 32, u.avatar_url)} />
+                </div>
+                <div>
+                  <p className="text-sm font-medium text-white">{u.username || u.email}</p>
+                  <p className="text-xs text-gray-500">{u.invites_used || 0} / {u.invite_quota || 0} used</p>
+                </div>
+              </div>
+              <div className="flex items-center gap-2">
+                <input type="number" min="0" className="w-16 px-2 py-1.5 text-sm text-center border border-white/10 rounded-lg bg-[#0a0a0a] text-gray-300 focus:outline-none focus:ring-1 focus:ring-primary"
+                  defaultValue={u.invite_quota || 0}
+                  onBlur={async (e) => {
+                    const val = parseInt(e.target.value) || 0;
+                    if (val === (u.invite_quota || 0)) return;
+                    await fetch(`/api/admin/users/${u.id}`, { method: "PATCH", headers: { "Content-Type": "application/json", ...(getCsrfToken() ? { "X-CSRF-Token": getCsrfToken()! } : {}) }, body: JSON.stringify({ invite_quota: val }) });
+                    revalidator.revalidate();
+                    toast({ title: `Updated invite quota for ${u.username || u.email}` });
+                  }} />
+                <button onClick={async () => {
+                  await fetch(`/api/admin/users/${u.id}`, { method: "PATCH", headers: { "Content-Type": "application/json", ...(getCsrfToken() ? { "X-CSRF-Token": getCsrfToken()! } : {}) }, body: JSON.stringify({ invites_used: 0 }) });
+                  revalidator.revalidate();
+                  toast({ title: `Reset invites for ${u.username || u.email}` });
+                }} className="p-1.5 text-gray-500 hover:text-primary hover:bg-primary/10 rounded-lg transition-all" title="Reset used count">
+                  <Icon name="restart_alt" className="text-lg" />
+                </button>
+              </div>
+            </div>
+          ))}
+        </div>
+      </section>
     </div>
   );
 }

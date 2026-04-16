@@ -8,11 +8,18 @@ export async function loader({ request }: { request: Request }) {
   const session = await getSession(request);
   if (!session) throw new Response(null, { status: 302, headers: { Location: "/auth/login" } });
   const systemSettings = queryOne<any>("SELECT * FROM system_settings LIMIT 1");
-  const userSettings = queryOne<any>("SELECT avatar_url FROM user_settings WHERE user_id = ?", [session.user.id]);
+  const userSettings = queryOne<any>("SELECT avatar_url, dashboard_layout FROM user_settings WHERE user_id = ?", [session.user.id]);
+  
+  // If user-controlled layout is enabled, override system layout with user's preference
+  const effectiveSettings = { ...systemSettings };
+  if (systemSettings?.user_controlled_layout && userSettings?.dashboard_layout) {
+    effectiveSettings.dashboard_layout = userSettings.dashboard_layout;
+  }
+  
   return {
     user: { ...session.user, avatar_url: userSettings?.avatar_url || null },
     isAdmin: isAdmin(session.user.id),
-    systemSettings: systemSettings || null,
+    systemSettings: effectiveSettings,
   };
 }
 

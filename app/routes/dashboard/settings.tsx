@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useLoaderData, useOutletContext, useRevalidator } from "react-router";
 import { getSession } from "~/.server/session";
 import { query, queryOne } from "~/.server/db";
@@ -14,11 +14,12 @@ export async function loader({ request }: { request: Request }) {
   const settings = queryOne<any>("SELECT * FROM user_settings WHERE user_id = ?", [session.user.id]);
   const tokens = query<any>("SELECT id, name, created_at, last_used_at FROM api_tokens WHERE user_id = ? ORDER BY created_at DESC", [session.user.id]);
   const user = queryOne<any>("SELECT totp_enabled FROM users WHERE id = ?", [session.user.id]);
-  return { settings, tokens, totp_enabled: user?.totp_enabled === 1 };
+  const sys = queryOne<any>("SELECT user_controlled_layout FROM system_settings LIMIT 1");
+  return { settings, tokens, totp_enabled: user?.totp_enabled === 1, userControlledLayout: sys?.user_controlled_layout === 1, inviteQuota: settings?.invite_quota || 0, invitesUsed: settings?.invites_used || 0 };
 }
 
 export default function SettingsPage() {
-  const { settings, tokens, totp_enabled } = useLoaderData<typeof loader>();
+  const { settings, tokens, totp_enabled, userControlledLayout, inviteQuota, invitesUsed } = useLoaderData<typeof loader>();
   const { user, systemSettings } = useOutletContext<any>();
   const { toast } = useToast();
   const revalidator = useRevalidator();
@@ -34,9 +35,20 @@ export default function SettingsPage() {
   const [sharexFolderName, setSharexFolderName] = useState(settings?.sharex_folder_name ?? "ShareX");
   const [sharexUrlMode, setSharexUrlMode] = useState<"raw" | "viewer">(settings?.sharex_url_mode || "raw");
   const [duplicateHandling, setDuplicateHandling] = useState<"reject" | "reuse" | "allow">(settings?.duplicate_handling || "reject");
+  const [dashboardLayout, setDashboardLayout] = useState(settings?.dashboard_layout || "sidebar");
   const [tokenName, setTokenName] = useState("");
   const [newToken, setNewToken] = useState<string | null>(null);
   const [avatarUploading, setAvatarUploading] = useState(false);
+  
+  // Invites state
+  const [userInvites, setUserInvites] = useState<any[]>([]);
+  const [inviteCreating, setInviteCreating] = useState(false);
+
+  useEffect(() => {
+    if (inviteQuota > 0) {
+      fetch("/api/user/invites").then(r => r.json()).then(d => setUserInvites(d.invites || [])).catch(() => {});
+    }
+  }, [inviteQuota]);
   
   // 2FA state
   const [totp2faEnabled, setTotp2faEnabled] = useState(false);
@@ -66,7 +78,7 @@ export default function SettingsPage() {
   const saveSettings = async () => {
     const res = await fetch("/api/user/settings", {
       method: "PUT", headers: { "Content-Type": "application/json", ...(getCsrfToken() ? { "X-CSRF-Token": getCsrfToken()! } : {}) },
-      body: JSON.stringify({ embed_title: embedTitle, embed_description: embedDescription || null, embed_color: embedColor, embed_author: embedAuthor || null, embed_site_name: embedSiteName || null, embed_logo_url: embedLogoUrl || null, default_public: defaultPublic, custom_path: customPath || null, sharex_folder_name: sharexFolderName || "ShareX", sharex_url_mode: sharexUrlMode, duplicate_handling: duplicateHandling }),
+      body: JSON.stringify({ embed_title: embedTitle, embed_description: embedDescription || null, embed_color: embedColor, embed_author: embedAuthor || null, embed_site_name: embedSiteName || null, embed_logo_url: embedLogoUrl || null, default_public: defaultPublic, custom_path: customPath || null, sharex_folder_name: sharexFolderName || "ShareX", sharex_url_mode: sharexUrlMode, duplicate_handling: duplicateHandling, dashboard_layout: dashboardLayout }),
     });
     if (res.ok) { revalidator.revalidate(); toast({ title: "Settings saved!" }); }
     else { const d = await res.json(); toast({ title: "Error", description: d.error, variant: "destructive" }); }
@@ -184,6 +196,33 @@ export default function SettingsPage() {
           </div>
         </div>
       </section>
+
+      {/* Dashboard Layout (user-controlled) */}
+      {userControlledLayout && (
+        <section className="bg-[#141414] border border-white/5 rounded-2xl p-8 shadow-glow-card space-y-6">
+          <h3 className="text-xl font-bold text-white flex items-center gap-2"><span className="w-1 h-6 bg-primary rounded-full" /> Dashboard Layout</h3>
+          <p className="text-sm text-gray-500 -mt-4">Choose your preferred dashboard layout</p>
+          <div className="grid grid-cols-3 gap-4">
+            {[
+              { id: "header", label: "Header", icon: "monitor", desc: "Nav on top" },
+              { id: "sidebar", label: "Sidebar", icon: "view_sidebar", desc: "Vertical nav" },
+              { id: "floating", label: "Floating", icon: "dock_to_bottom", desc: "Detached nav" },
+            ].map((l) => (
+              <label key={l.id} className="cursor-pointer group relative">
+                <input type="radio" name="userLayout" className="peer sr-only" checked={dashboardLayout === l.id} onChange={() => setDashboardLayout(l.id)} />
+                <div className={`bg-[#1a1a1a] border rounded-xl p-4 flex flex-col items-center justify-center gap-3 transition-all h-32 relative overflow-hidden ${dashboardLayout === l.id ? "border-primary ring-1 ring-primary/50 shadow-glow-primary" : "border-white/10 hover:border-gray-600"}`}>
+                  <Icon name={l.icon} className={`text-3xl ${dashboardLayout === l.id ? "text-primary" : "text-gray-500"}`} />
+                  <div className="text-center">
+                    <span className={`block text-sm font-bold ${dashboardLayout === l.id ? "text-primary" : "text-white"}`}>{l.label}</span>
+                    <span className="text-xs text-gray-500">{l.desc}</span>
+                  </div>
+                </div>
+                {dashboardLayout === l.id && <div className="absolute top-3 right-3 text-primary text-sm">✓</div>}
+              </label>
+            ))}
+          </div>
+        </section>
+      )}
 
       {/* Embed settings */}
       <section className="bg-[#141414] border border-white/5 rounded-2xl p-8 shadow-glow-card space-y-6">
@@ -354,6 +393,75 @@ export default function SettingsPage() {
           </div>
         )}
       </section>
+
+      {/* Invites */}
+      {inviteQuota > 0 && (
+        <section className="bg-[#141414] border border-white/5 rounded-2xl p-8 shadow-glow-card space-y-6">
+          <h3 className="text-xl font-bold text-white flex items-center gap-2"><span className="w-1 h-6 bg-primary rounded-full" /><Icon name="mail" className="text-xl" /> Invites</h3>
+          <p className="text-sm text-gray-500 -mt-4">Invite friends to join. You have {Math.max(0, inviteQuota - invitesUsed)} of {inviteQuota} invites remaining.</p>
+          
+          <div className="w-full bg-gray-800 rounded-full h-2 overflow-hidden">
+            <div className="h-full bg-primary rounded-full transition-all" style={{ width: `${Math.min(100, (invitesUsed / inviteQuota) * 100)}%` }} />
+          </div>
+
+          <button
+            onClick={async () => {
+              setInviteCreating(true);
+              try {
+                const res = await fetch("/api/user/invites", {
+                  method: "POST",
+                  headers: { "Content-Type": "application/json", ...(getCsrfToken() ? { "X-CSRF-Token": getCsrfToken()! } : {}) },
+                });
+                const d = await res.json();
+                if (!res.ok) throw new Error(d.error);
+                const base = systemSettings?.base_url || window.location.origin;
+                const link = `${base}/auth/sign-up?invite=${d.code}`;
+                navigator.clipboard.writeText(link);
+                setUserInvites(prev => [{ ...d, max_uses: 1, uses: 0, created_at: new Date().toISOString() }, ...prev]);
+                revalidator.revalidate();
+                toast({ title: "Invite created & link copied!" });
+              } catch (err: any) {
+                toast({ title: "Failed", description: err.message, variant: "destructive" });
+              } finally { setInviteCreating(false); }
+            }}
+            disabled={invitesUsed >= inviteQuota || inviteCreating}
+            className="bg-primary hover:bg-[var(--primary-hover)] text-white px-6 py-2.5 rounded-xl font-bold shadow-glow-primary transition-all flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            <Icon name="link" className="text-lg" /> {inviteCreating ? "Creating..." : "Generate Invite Link"}
+          </button>
+
+          {userInvites.length > 0 && (
+            <div className="space-y-2">
+              {userInvites.map((inv: any) => {
+                const expired = inv.expires_at && new Date(inv.expires_at) < new Date();
+                const full = inv.uses >= inv.max_uses;
+                return (
+                  <div key={inv.id} className={`flex items-center justify-between p-3 bg-white/[0.03] border border-white/5 rounded-xl ${(expired || full) ? "opacity-50" : ""}`}>
+                    <div>
+                      <p className="text-sm font-mono text-white">{inv.code}</p>
+                      <p className="text-xs text-gray-500">
+                        {inv.uses}/{inv.max_uses} uses
+                        {inv.used_by_name && ` • used by ${inv.used_by_name}`}
+                        {expired && " • Expired"}
+                        {full && !expired && " • Used"}
+                      </p>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <button onClick={() => { const base = systemSettings?.base_url || window.location.origin; navigator.clipboard.writeText(`${base}/auth/sign-up?invite=${inv.code}`); toast({ title: "Link copied!" }); }}
+                        className="p-2 text-gray-500 hover:text-white hover:bg-white/10 rounded-lg transition-all"><Icon name="content_copy" /></button>
+                      <button onClick={async () => {
+                        await fetch("/api/user/invites", { method: "DELETE", headers: { "Content-Type": "application/json", ...(getCsrfToken() ? { "X-CSRF-Token": getCsrfToken()! } : {}) }, body: JSON.stringify({ id: inv.id }) });
+                        setUserInvites(prev => prev.filter(i => i.id !== inv.id));
+                        toast({ title: "Invite deleted" });
+                      }} className="p-2 text-gray-500 hover:text-red-400 hover:bg-red-500/10 rounded-lg transition-all"><Icon name="delete" /></button>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </section>
+      )}
 
       {/* API Tokens */}
       <section className="bg-[#141414] border border-white/5 rounded-2xl p-8 shadow-glow-card space-y-6">

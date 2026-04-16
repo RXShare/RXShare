@@ -29,7 +29,7 @@ export async function action({ request }: { request: Request }) {
   const sys = queryOne<any>("SELECT id FROM system_settings LIMIT 1");
   if (!sys) return Response.json({ error: "No system settings" }, { status: 500 });
 
-  const allowed = ["site_name", "site_description", "base_url", "allow_registration", "allow_login", "allow_email", "default_quota", "max_upload_size", "primary_color", "accent_color", "dashboard_layout", "logo_url", "background_pattern", "captcha_provider", "captcha_site_key", "captcha_secret_key", "captcha_on_login", "captcha_on_signup", "captcha_on_upload", "show_powered_by"];
+  const allowed = ["site_name", "site_description", "base_url", "allow_registration", "allow_login", "allow_email", "default_quota", "max_upload_size", "primary_color", "accent_color", "dashboard_layout", "logo_url", "background_pattern", "captcha_provider", "captcha_site_key", "captcha_secret_key", "captcha_on_login", "captcha_on_signup", "captcha_on_upload", "show_powered_by", "user_controlled_layout"];
   const colorFields = ["primary_color", "accent_color"];
   const sets: string[] = [];
   const vals: any[] = [];

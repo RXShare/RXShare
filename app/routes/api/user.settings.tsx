@@ -25,7 +25,7 @@ export async function action({ request }: { request: Request }) {
   if (!session) return Response.json({ error: "Unauthorized" }, { status: 401 });
 
   const body = await request.json();
-  const allowed = ["embed_title", "embed_description", "embed_color", "embed_author", "embed_site_name", "embed_logo_url", "default_public", "custom_path", "sharex_folder_name", "sharex_url_mode", "duplicate_handling"];
+  const allowed = ["embed_title", "embed_description", "embed_color", "embed_author", "embed_site_name", "embed_logo_url", "default_public", "custom_path", "sharex_folder_name", "sharex_url_mode", "duplicate_handling", "dashboard_layout"];
   const sets: string[] = [];
   const vals: any[] = [];
 
@@ -54,6 +54,9 @@ export async function action({ request }: { request: Request }) {
       }
       if (key === "duplicate_handling" && typeof val === "string") {
         if (!["reject", "reuse", "allow"].includes(val)) val = "reject";
+      }
+      if (key === "dashboard_layout" && typeof val === "string") {
+        if (!["sidebar", "header", "floating"].includes(val)) val = "sidebar";
       }
       // Sanitize strings
       if (typeof val === "string") val = val.replace(/[\x00-\x08\x0B\x0C\x0E-\x1F]/g, "");

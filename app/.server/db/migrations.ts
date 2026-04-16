@@ -156,6 +156,12 @@ export function getMigrationUpdates(): string[] {
     "ALTER TABLE system_settings ADD COLUMN captcha_on_upload INTEGER DEFAULT 0",
     // Powered by badge
     "ALTER TABLE system_settings ADD COLUMN show_powered_by INTEGER DEFAULT 1",
+    // User-controlled dashboard layout
+    "ALTER TABLE system_settings ADD COLUMN user_controlled_layout INTEGER DEFAULT 0",
+    "ALTER TABLE user_settings ADD COLUMN dashboard_layout TEXT DEFAULT 'sidebar'",
+    // User invite quotas
+    "ALTER TABLE user_settings ADD COLUMN invite_quota INTEGER DEFAULT 0",
+    "ALTER TABLE user_settings ADD COLUMN invites_used INTEGER DEFAULT 0",
   ];
 }
 
