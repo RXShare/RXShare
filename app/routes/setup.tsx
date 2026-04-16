@@ -5,7 +5,7 @@ import { Icon } from "~/components/Icon";
 import { getCsrfToken } from "~/lib/csrf";
 
 const DEFAULT_LOGO = "https://cdn.rxss.click/rexsystems/logo-transparent.svg";
-const TOTAL_STEPS = 5;
+const TOTAL_STEPS = 6;
 
 export default function Setup() {
   const navigate = useNavigate();
@@ -40,6 +40,13 @@ export default function Setup() {
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
 
+  // Step 5: CAPTCHA
+  const [captchaProvider, setCaptchaProvider] = useState<"none" | "recaptcha" | "turnstile" | "hcaptcha">("none");
+  const [captchaSiteKey, setCaptchaSiteKey] = useState("");
+  const [captchaSecretKey, setCaptchaSecretKey] = useState("");
+  const [captchaOnLogin, setCaptchaOnLogin] = useState(true);
+  const [captchaOnSignup, setCaptchaOnSignup] = useState(true);
+
   const inputCls = "block w-full px-4 py-3 border border-white/10 rounded-xl bg-[#0a0a0a] text-gray-300 placeholder-gray-600 focus:outline-none focus:ring-1 focus:ring-primary focus:border-primary text-sm transition-all shadow-[inset_0_1px_0_0_rgba(255,255,255,0.05)]";
 
   const handleConfirmSetup = async () => {
@@ -47,6 +54,9 @@ export default function Setup() {
     if (password.length < 6) { toast({ title: "Password must be at least 6 characters", variant: "destructive" }); return; }
     const usernameRegex = /^[a-z0-9][a-z0-9._-]{1,28}[a-z0-9]$/;
     if (!usernameRegex.test(username)) { toast({ title: "Invalid username", description: "3-30 chars, lowercase alphanumeric with . _ -", variant: "destructive" }); return; }
+    if (captchaProvider !== "none" && (!captchaSiteKey.trim() || !captchaSecretKey.trim())) {
+      toast({ title: "CAPTCHA keys required", description: "Enter both Site Key and Secret Key, or set provider to Disabled.", variant: "destructive" }); return;
+    }
     setLoading(true);
     try {
       // Step 1: Save .env config
@@ -61,10 +71,14 @@ export default function Setup() {
       });
       if (!configRes.ok) { const d = await configRes.json(); throw new Error(d.error || "Failed to save config"); }
 
-      // Step 2: Create admin account + system settings
+      // Step 2: Create admin account + system settings (includes CAPTCHA config)
       const res = await fetch("/api/auth/signup", {
         method: "POST", headers: { "Content-Type": "application/json", ...(getCsrfToken() ? { "X-CSRF-Token": getCsrfToken()! } : {}) },
-        body: JSON.stringify({ email, password, username, isSetup: true, siteName, baseUrl: baseUrl || null }),
+        body: JSON.stringify({
+          email, password, username, isSetup: true, siteName, baseUrl: baseUrl || null,
+          captchaProvider, captchaSiteKey: captchaSiteKey.trim() || null, captchaSecretKey: captchaSecretKey.trim() || null,
+          captchaOnLogin, captchaOnSignup,
+        }),
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "Setup failed");
@@ -76,12 +90,19 @@ export default function Setup() {
     } finally { setLoading(false); }
   };
 
-  const stepTitles = ["Database", "Storage", "Site Config", "Admin Account", "Review & Confirm"];
+  const stepTitles = ["Database", "Storage", "Site Config", "Admin Account", "Security", "Review & Confirm"];
 
   const getProviderLabel = () => {
     if (s3Provider === "aws") return "AWS S3";
     if (s3Provider === "cloudflare") return "Cloudflare R2";
     return "Custom";
+  };
+
+  const getCaptchaLabel = () => {
+    if (captchaProvider === "recaptcha") return "Google reCAPTCHA v2";
+    if (captchaProvider === "turnstile") return "Cloudflare Turnstile";
+    if (captchaProvider === "hcaptcha") return "hCaptcha";
+    return "Disabled";
   };
 
   const maskSecret = (s: string) => s ? "••••" + s.slice(-4) : "—";
@@ -308,15 +329,87 @@ export default function Setup() {
                   </button>
                   <button onClick={() => setStep(5)} disabled={!email || !username || !password || !confirmPassword}
                     className="flex-1 bg-primary hover:bg-[var(--primary-hover)] text-white py-3 rounded-xl font-bold shadow-glow-primary transition-all hover:scale-[1.02] disabled:opacity-50 flex items-center justify-center gap-2">
+                    Next <Icon name="arrow_forward" className="text-lg" />
+                  </button>
+                </div>
+              </div>
+            )}
+
+            {/* Step 5: Security / CAPTCHA */}
+            {step === 5 && (
+              <div key="step5" className="space-y-5 animate-in fade-in slide-in-from-right-4 duration-200">
+                <p className="text-sm text-gray-400">Protect your instance from bots and abuse. Choose a CAPTCHA provider or skip this step to configure later.</p>
+                <div className="grid grid-cols-2 gap-3">
+                  {([
+                    { id: "none", label: "Skip / Disabled", icon: "block", desc: "No CAPTCHA" },
+                    { id: "recaptcha", label: "reCAPTCHA v2", icon: "security", desc: "Google" },
+                    { id: "turnstile", label: "Turnstile", icon: "shield", desc: "Cloudflare" },
+                    { id: "hcaptcha", label: "hCaptcha", icon: "verified_user", desc: "hCaptcha" },
+                  ] as const).map((p) => (
+                    <button key={p.id} onClick={() => setCaptchaProvider(p.id)}
+                      className={`p-4 rounded-xl border text-left transition-all ${captchaProvider === p.id ? "border-primary bg-primary/10 shadow-glow-primary" : "border-white/10 bg-[#0a0a0a] hover:border-white/20"}`}>
+                      <div className="flex items-center gap-3 mb-1">
+                        <Icon name={p.icon} className={`text-xl ${captchaProvider === p.id ? "text-primary" : "text-gray-500"}`} />
+                        <span className={`font-bold text-sm ${captchaProvider === p.id ? "text-white" : "text-gray-300"}`}>{p.label}</span>
+                      </div>
+                      <p className="text-xs text-gray-500">{p.desc}</p>
+                    </button>
+                  ))}
+                </div>
+                {captchaProvider !== "none" && (
+                  <div className="space-y-3 animate-in fade-in duration-200 pt-2">
+                    <p className="text-xs text-gray-500">
+                      Get your keys from{" "}
+                      {captchaProvider === "recaptcha" && <a href="https://www.google.com/recaptcha/admin" target="_blank" rel="noopener noreferrer" className="text-primary hover:underline">Google reCAPTCHA Admin</a>}
+                      {captchaProvider === "turnstile" && <a href="https://dash.cloudflare.com/?to=/:account/turnstile" target="_blank" rel="noopener noreferrer" className="text-primary hover:underline">Cloudflare Dashboard</a>}
+                      {captchaProvider === "hcaptcha" && <a href="https://dashboard.hcaptcha.com/signup" target="_blank" rel="noopener noreferrer" className="text-primary hover:underline">hCaptcha Dashboard</a>}
+                    </p>
+                    <div className="space-y-1.5">
+                      <label className="text-xs font-medium text-gray-400">Site Key</label>
+                      <input value={captchaSiteKey} onChange={(e) => setCaptchaSiteKey(e.target.value)} className={inputCls} placeholder="Enter site key" />
+                    </div>
+                    <div className="space-y-1.5">
+                      <label className="text-xs font-medium text-gray-400">Secret Key</label>
+                      <input type="password" value={captchaSecretKey} onChange={(e) => setCaptchaSecretKey(e.target.value)} className={inputCls} placeholder="Enter secret key" />
+                    </div>
+                    <div className="h-px bg-white/5" />
+                    <p className="text-xs font-medium text-gray-400">Enforce on:</p>
+                    <div className="grid grid-cols-2 gap-3">
+                      <label className="flex items-center gap-3 p-3 rounded-lg border border-white/10 bg-[#0a0a0a] cursor-pointer hover:border-white/20 transition-all">
+                        <input type="checkbox" checked={captchaOnLogin} onChange={(e) => setCaptchaOnLogin(e.target.checked)}
+                          className="w-4 h-4 rounded border-white/20 bg-transparent accent-[var(--primary,#f97316)]" />
+                        <div>
+                          <span className="text-sm text-white">Login</span>
+                          <p className="text-[10px] text-gray-500">Credential stuffing protection</p>
+                        </div>
+                      </label>
+                      <label className="flex items-center gap-3 p-3 rounded-lg border border-white/10 bg-[#0a0a0a] cursor-pointer hover:border-white/20 transition-all">
+                        <input type="checkbox" checked={captchaOnSignup} onChange={(e) => setCaptchaOnSignup(e.target.checked)}
+                          className="w-4 h-4 rounded border-white/20 bg-transparent accent-[var(--primary,#f97316)]" />
+                        <div>
+                          <span className="text-sm text-white">Sign Up</span>
+                          <p className="text-[10px] text-gray-500">Prevent fake accounts</p>
+                        </div>
+                      </label>
+                    </div>
+                  </div>
+                )}
+                <div className="flex gap-3">
+                  <button onClick={() => setStep(4)}
+                    className="px-4 py-3 rounded-xl font-medium text-gray-400 border border-white/10 hover:bg-white/5 hover:text-white transition-all flex items-center gap-2">
+                    <Icon name="arrow_back" className="text-lg" /> Back
+                  </button>
+                  <button onClick={() => setStep(6)}
+                    className="flex-1 bg-primary hover:bg-[var(--primary-hover)] text-white py-3 rounded-xl font-bold shadow-glow-primary transition-all hover:scale-[1.02] flex items-center justify-center gap-2">
                     Review <Icon name="arrow_forward" className="text-lg" />
                   </button>
                 </div>
               </div>
             )}
 
-            {/* Step 5: Review & Confirm */}
-            {step === 5 && (
-              <div key="step5" className="space-y-5 animate-in fade-in slide-in-from-right-4 duration-200">
+            {/* Step 6: Review & Confirm */}
+            {step === 6 && (
+              <div key="step6" className="space-y-5 animate-in fade-in slide-in-from-right-4 duration-200">
                 <p className="text-sm text-gray-400">Please review your configuration before finalizing. This will create your <span className="text-white font-mono text-xs">.env</span> file and set up the database.</p>
 
                 {/* Database */}
@@ -393,8 +486,29 @@ export default function Setup() {
                   </div>
                 </div>
 
+                {/* Security */}
+                <div className="rounded-xl border border-white/10 bg-[#0a0a0a] overflow-hidden">
+                  <div className="flex items-center justify-between px-4 py-3 border-b border-white/5 bg-white/[0.02]">
+                    <div className="flex items-center gap-2">
+                      <Icon name="shield" className="text-primary" />
+                      <span className="text-sm font-bold text-white">Security</span>
+                    </div>
+                    <button onClick={() => setStep(5)} className="text-xs text-primary hover:underline">Edit</button>
+                  </div>
+                  <div className="px-4 py-3 space-y-1 text-sm">
+                    <div className="flex justify-between"><span className="text-gray-500">CAPTCHA</span><span className="text-white">{getCaptchaLabel()}</span></div>
+                    {captchaProvider !== "none" && (
+                      <>
+                        <div className="flex justify-between"><span className="text-gray-500">Site Key</span><span className="text-white font-mono text-xs">{maskSecret(captchaSiteKey)}</span></div>
+                        <div className="flex justify-between"><span className="text-gray-500">On Login</span><span className="text-white">{captchaOnLogin ? "Yes" : "No"}</span></div>
+                        <div className="flex justify-between"><span className="text-gray-500">On Sign Up</span><span className="text-white">{captchaOnSignup ? "Yes" : "No"}</span></div>
+                      </>
+                    )}
+                  </div>
+                </div>
+
                 <div className="flex gap-3">
-                  <button onClick={() => setStep(4)}
+                  <button onClick={() => setStep(5)}
                     className="px-4 py-3 rounded-xl font-medium text-gray-400 border border-white/10 hover:bg-white/5 hover:text-white transition-all flex items-center gap-2">
                     <Icon name="arrow_back" className="text-lg" /> Back
                   </button>

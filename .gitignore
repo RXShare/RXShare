@@ -7,5 +7,7 @@ data/
 *.local
 .DS_Store
 .env
+*.env.local
+old.env
 *.log
 stitch-design-export/
