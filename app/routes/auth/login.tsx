@@ -6,8 +6,14 @@ import { Captcha, useCaptcha } from "~/components/Captcha";
 
 const DEFAULT_LOGO = "https://cdn.rxss.click/rexsystems/logo-transparent.svg";
 
-export async function loader() {
+export async function loader({ request }: { request: Request }) {
   const { queryOne, isFirstRun } = await import("~/.server/db");
+  const { getSession } = await import("~/.server/session");
+  
+  // Redirect logged-in users to dashboard
+  const session = await getSession(request);
+  if (session) throw new Response(null, { status: 302, headers: { Location: "/dashboard" } });
+  
   if (isFirstRun()) return { settings: null };
   try {
     const settings = queryOne<any>("SELECT site_name, site_description, allow_registration, allow_login, primary_color, accent_color, logo_url, background_pattern, captcha_provider, captcha_site_key, captcha_on_login FROM system_settings LIMIT 1");
