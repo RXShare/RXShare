@@ -316,6 +316,7 @@ function SettingsTab({ systemSettings, toast, revalidator }: any) {
   const [showPoweredBy, setShowPoweredBy] = useState(systemSettings?.show_powered_by !== 0);
   const [defaultQuota, setDefaultQuota] = useState(String(Math.round((systemSettings?.default_quota || 1073741824) / 1024 / 1024)));
   const [maxUpload, setMaxUpload] = useState(String(Math.round((systemSettings?.max_upload_size || 104857600) / 1024 / 1024)));
+  const [defaultInviteQuota, setDefaultInviteQuota] = useState(String(systemSettings?.default_invite_quota || 0));
 
   const save = async () => {
     const res = await fetch("/api/admin/system-settings", {
@@ -325,6 +326,7 @@ function SettingsTab({ systemSettings, toast, revalidator }: any) {
         allow_registration: allowReg ? 1 : 0, allow_login: allowLogin ? 1 : 0,
         default_quota: parseInt(defaultQuota) * 1024 * 1024, max_upload_size: parseInt(maxUpload) * 1024 * 1024,
         show_powered_by: showPoweredBy ? 1 : 0,
+        default_invite_quota: parseInt(defaultInviteQuota) || 0,
       }),
     });
     if (res.ok) { revalidator.revalidate(); toast({ title: "Settings saved!" }); }
@@ -355,6 +357,7 @@ function SettingsTab({ systemSettings, toast, revalidator }: any) {
         <div className="h-px bg-white/5" />
         <div className="space-y-2"><label className="text-sm font-medium text-gray-400">Default Quota (MB)</label><input type="number" value={defaultQuota} onChange={(e) => setDefaultQuota(e.target.value)} className={inputCls} /><p className="text-xs text-gray-600">{formatFileSize(parseInt(defaultQuota || "0") * 1024 * 1024)}</p></div>
         <div className="space-y-2"><label className="text-sm font-medium text-gray-400">Max Upload Size (MB)</label><input type="number" value={maxUpload} onChange={(e) => setMaxUpload(e.target.value)} className={inputCls} /><p className="text-xs text-gray-600">{formatFileSize(parseInt(maxUpload || "0") * 1024 * 1024)}</p></div>
+        <div className="space-y-2"><label className="text-sm font-medium text-gray-400">Default Invite Quota</label><input type="number" value={defaultInviteQuota} onChange={(e) => setDefaultInviteQuota(e.target.value)} className={inputCls} min="0" /><p className="text-xs text-gray-600">Invites given to new users on registration. 0 = none.</p></div>
         <button onClick={save} className="bg-primary hover:bg-[var(--primary-hover)] text-white px-8 py-3 rounded-xl font-bold shadow-glow-primary transition-all hover:scale-105 flex items-center gap-2">Save Configuration</button>
       </section>
     </div>

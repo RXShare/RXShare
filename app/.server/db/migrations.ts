@@ -162,6 +162,8 @@ export function getMigrationUpdates(): string[] {
     // User invite quotas
     "ALTER TABLE user_settings ADD COLUMN invite_quota INTEGER DEFAULT 0",
     "ALTER TABLE user_settings ADD COLUMN invites_used INTEGER DEFAULT 0",
+    // Default invite quota for new registrations
+    "ALTER TABLE system_settings ADD COLUMN default_invite_quota INTEGER DEFAULT 0",
   ];
 }
 

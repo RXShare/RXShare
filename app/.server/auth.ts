@@ -71,8 +71,13 @@ export async function createUser(email: string, password: string, username: stri
 
   execute("INSERT INTO users (id, email, username, password_hash, created_at) VALUES (?, ?, ?, ?, ?)",
     [userId, email.toLowerCase().trim(), sanitized, passwordHash, now]);
-  execute("INSERT INTO user_settings (id, user_id, created_at, updated_at) VALUES (?, ?, ?, ?)",
-    [nanoid(), userId, now, now]);
+  
+  // Get default invite quota from system settings
+  const sys = queryOne<any>("SELECT default_invite_quota FROM system_settings LIMIT 1");
+  const defaultInviteQuota = sys?.default_invite_quota || 0;
+  
+  execute("INSERT INTO user_settings (id, user_id, invite_quota, created_at, updated_at) VALUES (?, ?, ?, ?, ?)",
+    [nanoid(), userId, defaultInviteQuota, now, now]);
 
   return { id: userId, email: email.toLowerCase().trim(), username: sanitized, created_at: now, last_sign_in_at: null };
 }
