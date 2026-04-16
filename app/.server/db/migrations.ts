@@ -164,6 +164,11 @@ export function getMigrationUpdates(): string[] {
     "ALTER TABLE user_settings ADD COLUMN invites_used INTEGER DEFAULT 0",
     // Default invite quota for new registrations
     "ALTER TABLE system_settings ADD COLUMN default_invite_quota INTEGER DEFAULT 0",
+    // Email / Resend config
+    "ALTER TABLE system_settings ADD COLUMN resend_api_key TEXT",
+    "ALTER TABLE system_settings ADD COLUMN email_from TEXT",
+    // Email verified flag
+    "ALTER TABLE users ADD COLUMN email_verified INTEGER DEFAULT 0",
   ];
 }
 
@@ -256,5 +261,16 @@ export function getNewTablesSQL(dbType: DbType): string[] {
     )`,
     "CREATE INDEX IF NOT EXISTS idx_totp_sessions_user_id ON totp_sessions(user_id)",
     "CREATE INDEX IF NOT EXISTS idx_totp_sessions_expires_at ON totp_sessions(expires_at)",
+    // Password reset tokens
+    `CREATE TABLE IF NOT EXISTS password_reset_tokens (
+      id ${textType} PRIMARY KEY,
+      user_id ${textType} NOT NULL,
+      token ${textType} NOT NULL UNIQUE,
+      expires_at ${autoTs},
+      used ${intBool} NOT NULL DEFAULT 0,
+      created_at ${autoTs},
+      FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+    )`,
+    "CREATE INDEX IF NOT EXISTS idx_password_reset_tokens_token ON password_reset_tokens(token)",
   ];
 }

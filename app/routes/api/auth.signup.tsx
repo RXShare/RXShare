@@ -25,7 +25,7 @@ export async function action({ request }: { request: Request }) {
   if (limited) return limited;
 
   const body = await request.json();
-  const { email, password, username, isSetup, siteName, baseUrl, captchaProvider, captchaSiteKey, captchaSecretKey, captchaOnLogin, captchaOnSignup } = body;
+  const { email, password, username, isSetup, siteName, baseUrl, captchaProvider, captchaSiteKey, captchaSecretKey, captchaOnLogin, captchaOnSignup, resendApiKey, emailFrom } = body;
 
   if (!email || !password || !username) return Response.json({ error: "All fields required" }, { status: 400 });
 
@@ -53,8 +53,8 @@ export async function action({ request }: { request: Request }) {
       const existing = queryOne<any>("SELECT id FROM system_settings LIMIT 1");
       if (!existing) {
         execute(
-          "INSERT INTO system_settings (id, site_name, base_url, captcha_provider, captcha_site_key, captcha_secret_key, captcha_on_login, captcha_on_signup) VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
-          [nanoid(), siteName || "RXShare", baseUrl || null, captchaProvider || "none", captchaSiteKey || null, captchaSecretKey || null, captchaOnLogin ? 1 : 0, captchaOnSignup ? 1 : 0]
+          "INSERT INTO system_settings (id, site_name, base_url, captcha_provider, captcha_site_key, captcha_secret_key, captcha_on_login, captcha_on_signup, resend_api_key, email_from) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+          [nanoid(), siteName || "RXShare", baseUrl || null, captchaProvider || "none", captchaSiteKey || null, captchaSecretKey || null, captchaOnLogin ? 1 : 0, captchaOnSignup ? 1 : 0, resendApiKey || null, emailFrom || null]
         );
       }
       markSetupDone();

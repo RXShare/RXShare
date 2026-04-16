@@ -5,7 +5,7 @@ import { Icon } from "~/components/Icon";
 import { getCsrfToken } from "~/lib/csrf";
 
 const DEFAULT_LOGO = "https://cdn.rxss.click/rexsystems/logo-transparent.svg";
-const TOTAL_STEPS = 6;
+const TOTAL_STEPS = 7;
 
 export default function Setup() {
   const navigate = useNavigate();
@@ -47,6 +47,10 @@ export default function Setup() {
   const [captchaOnLogin, setCaptchaOnLogin] = useState(true);
   const [captchaOnSignup, setCaptchaOnSignup] = useState(true);
 
+  // Step 6: Email (Resend)
+  const [resendApiKey, setResendApiKey] = useState("");
+  const [emailFrom, setEmailFrom] = useState("");
+
   const inputCls = "block w-full px-4 py-3 border border-white/10 rounded-xl bg-[#0a0a0a] text-gray-300 placeholder-gray-600 focus:outline-none focus:ring-1 focus:ring-primary focus:border-primary text-sm transition-all shadow-[inset_0_1px_0_0_rgba(255,255,255,0.05)]";
 
   const handleConfirmSetup = async () => {
@@ -78,6 +82,7 @@ export default function Setup() {
           email, password, username, isSetup: true, siteName, baseUrl: baseUrl || null,
           captchaProvider, captchaSiteKey: captchaSiteKey.trim() || null, captchaSecretKey: captchaSecretKey.trim() || null,
           captchaOnLogin, captchaOnSignup,
+          resendApiKey: resendApiKey.trim() || null, emailFrom: emailFrom.trim() || null,
         }),
       });
       const data = await res.json();
@@ -90,7 +95,7 @@ export default function Setup() {
     } finally { setLoading(false); }
   };
 
-  const stepTitles = ["Database", "Storage", "Site Config", "Admin Account", "Security", "Review & Confirm"];
+  const stepTitles = ["Database", "Storage", "Site Config", "Admin Account", "Security", "Email", "Review & Confirm"];
 
   const getProviderLabel = () => {
     if (s3Provider === "aws") return "AWS S3";
@@ -401,14 +406,43 @@ export default function Setup() {
                   </button>
                   <button onClick={() => setStep(6)}
                     className="flex-1 bg-primary hover:bg-[var(--primary-hover)] text-white py-3 rounded-xl font-bold shadow-glow-primary transition-all hover:scale-[1.02] flex items-center justify-center gap-2">
+                    Next <Icon name="arrow_forward" className="text-lg" />
+                  </button>
+                </div>
+              </div>
+            )}
+
+            {/* Step 6: Email (Resend) */}
+            {step === 6 && (
+              <div key="step6" className="space-y-5 animate-in fade-in slide-in-from-right-4 duration-200">
+                <p className="text-sm text-gray-400">Configure email for password resets and notifications. Uses <a href="https://resend.com" target="_blank" rel="noopener noreferrer" className="text-primary hover:underline">Resend</a>. You can skip this and configure later.</p>
+                <div className="space-y-3">
+                  <div className="space-y-1.5">
+                    <label className="text-xs font-medium text-gray-400">Resend API Key</label>
+                    <input type="password" value={resendApiKey} onChange={(e) => setResendApiKey(e.target.value)} className={inputCls} placeholder="re_..." />
+                    <p className="text-xs text-gray-600">Get one at <a href="https://resend.com/api-keys" target="_blank" rel="noopener noreferrer" className="text-primary hover:underline">resend.com/api-keys</a></p>
+                  </div>
+                  <div className="space-y-1.5">
+                    <label className="text-xs font-medium text-gray-400">From Address</label>
+                    <input value={emailFrom} onChange={(e) => setEmailFrom(e.target.value)} className={inputCls} placeholder="RXShare <noreply@yourdomain.com>" />
+                    <p className="text-xs text-gray-600">Must be a verified domain in Resend, or use noreply@resend.dev for testing</p>
+                  </div>
+                </div>
+                <div className="flex gap-3">
+                  <button onClick={() => setStep(5)}
+                    className="px-4 py-3 rounded-xl font-medium text-gray-400 border border-white/10 hover:bg-white/5 hover:text-white transition-all flex items-center gap-2">
+                    <Icon name="arrow_back" className="text-lg" /> Back
+                  </button>
+                  <button onClick={() => setStep(7)}
+                    className="flex-1 bg-primary hover:bg-[var(--primary-hover)] text-white py-3 rounded-xl font-bold shadow-glow-primary transition-all hover:scale-[1.02] flex items-center justify-center gap-2">
                     Review <Icon name="arrow_forward" className="text-lg" />
                   </button>
                 </div>
               </div>
             )}
 
-            {/* Step 6: Review & Confirm */}
-            {step === 6 && (
+            {/* Step 7: Review & Confirm */}
+            {step === 7 && (
               <div key="step6" className="space-y-5 animate-in fade-in slide-in-from-right-4 duration-200">
                 <p className="text-sm text-gray-400">Please review your configuration before finalizing. This will create your <span className="text-white font-mono text-xs">.env</span> file and set up the database.</p>
 
@@ -507,8 +541,24 @@ export default function Setup() {
                   </div>
                 </div>
 
+                {/* Email */}
+                <div className="rounded-xl border border-white/10 bg-[#0a0a0a] overflow-hidden">
+                  <div className="flex items-center justify-between px-4 py-3 border-b border-white/5 bg-white/[0.02]">
+                    <div className="flex items-center gap-2">
+                      <Icon name="mail" className="text-primary" />
+                      <span className="text-sm font-bold text-white">Email</span>
+                    </div>
+                    <button onClick={() => setStep(6)} className="text-xs text-primary hover:underline">Edit</button>
+                  </div>
+                  <div className="px-4 py-3 space-y-1 text-sm">
+                    <div className="flex justify-between"><span className="text-gray-500">Provider</span><span className="text-white">{resendApiKey ? "Resend" : "Not configured"}</span></div>
+                    {resendApiKey && <div className="flex justify-between"><span className="text-gray-500">API Key</span><span className="text-white font-mono text-xs">{maskSecret(resendApiKey)}</span></div>}
+                    {emailFrom && <div className="flex justify-between"><span className="text-gray-500">From</span><span className="text-white text-xs">{emailFrom}</span></div>}
+                  </div>
+                </div>
+
                 <div className="flex gap-3">
-                  <button onClick={() => setStep(5)}
+                  <button onClick={() => setStep(6)}
                     className="px-4 py-3 rounded-xl font-medium text-gray-400 border border-white/10 hover:bg-white/5 hover:text-white transition-all flex items-center gap-2">
                     <Icon name="arrow_back" className="text-lg" /> Back
                   </button>

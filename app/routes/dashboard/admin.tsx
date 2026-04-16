@@ -317,6 +317,8 @@ function SettingsTab({ systemSettings, toast, revalidator }: any) {
   const [defaultQuota, setDefaultQuota] = useState(String(Math.round((systemSettings?.default_quota || 1073741824) / 1024 / 1024)));
   const [maxUpload, setMaxUpload] = useState(String(Math.round((systemSettings?.max_upload_size || 104857600) / 1024 / 1024)));
   const [defaultInviteQuota, setDefaultInviteQuota] = useState(String(systemSettings?.default_invite_quota || 0));
+  const [resendApiKey, setResendApiKey] = useState(systemSettings?.resend_api_key || "");
+  const [emailFrom, setEmailFrom] = useState(systemSettings?.email_from || "");
 
   const save = async () => {
     const res = await fetch("/api/admin/system-settings", {
@@ -327,6 +329,8 @@ function SettingsTab({ systemSettings, toast, revalidator }: any) {
         default_quota: parseInt(defaultQuota) * 1024 * 1024, max_upload_size: parseInt(maxUpload) * 1024 * 1024,
         show_powered_by: showPoweredBy ? 1 : 0,
         default_invite_quota: parseInt(defaultInviteQuota) || 0,
+        resend_api_key: resendApiKey || null,
+        email_from: emailFrom || null,
       }),
     });
     if (res.ok) { revalidator.revalidate(); toast({ title: "Settings saved!" }); }
@@ -358,6 +362,11 @@ function SettingsTab({ systemSettings, toast, revalidator }: any) {
         <div className="space-y-2"><label className="text-sm font-medium text-gray-400">Default Quota (MB)</label><input type="number" value={defaultQuota} onChange={(e) => setDefaultQuota(e.target.value)} className={inputCls} /><p className="text-xs text-gray-600">{formatFileSize(parseInt(defaultQuota || "0") * 1024 * 1024)}</p></div>
         <div className="space-y-2"><label className="text-sm font-medium text-gray-400">Max Upload Size (MB)</label><input type="number" value={maxUpload} onChange={(e) => setMaxUpload(e.target.value)} className={inputCls} /><p className="text-xs text-gray-600">{formatFileSize(parseInt(maxUpload || "0") * 1024 * 1024)}</p></div>
         <div className="space-y-2"><label className="text-sm font-medium text-gray-400">Default Invite Quota</label><input type="number" value={defaultInviteQuota} onChange={(e) => setDefaultInviteQuota(e.target.value)} className={inputCls} min="0" /><p className="text-xs text-gray-600">Invites given to new users on registration. 0 = none.</p></div>
+        <div className="h-px bg-white/5" />
+        <h4 className="text-sm font-bold text-white flex items-center gap-2"><Icon name="mail" className="text-primary text-lg" /> Email (Resend)</h4>
+        <p className="text-xs text-gray-500 -mt-4">Required for forgot password and email notifications. Get an API key from <a href="https://resend.com" target="_blank" rel="noopener noreferrer" className="text-primary hover:underline">resend.com</a></p>
+        <div className="space-y-2"><label className="text-sm font-medium text-gray-400">Resend API Key</label><input type="password" value={resendApiKey} onChange={(e) => setResendApiKey(e.target.value)} className={inputCls} placeholder="re_..." /></div>
+        <div className="space-y-2"><label className="text-sm font-medium text-gray-400">From Address</label><input value={emailFrom} onChange={(e) => setEmailFrom(e.target.value)} className={inputCls} placeholder="RXShare <noreply@yourdomain.com>" /><p className="text-xs text-gray-600">Must be a verified domain in Resend, or use noreply@resend.dev for testing</p></div>
         <button onClick={save} className="bg-primary hover:bg-[var(--primary-hover)] text-white px-8 py-3 rounded-xl font-bold shadow-glow-primary transition-all hover:scale-105 flex items-center gap-2">Save Configuration</button>
       </section>
     </div>

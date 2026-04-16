@@ -5,6 +5,8 @@ export default [
   route("setup", "routes/setup.tsx"),
   route("auth/login", "routes/auth/login.tsx"),
   route("auth/sign-up", "routes/auth/sign-up.tsx"),
+  route("auth/forgot-password", "routes/auth/forgot-password.tsx"),
+  route("auth/reset-password", "routes/auth/reset-password.tsx"),
   layout("routes/dashboard/layout.tsx", [
     route("dashboard", "routes/dashboard/index.tsx"),
     route("dashboard/settings", "routes/dashboard/settings.tsx"),
@@ -20,6 +22,8 @@ export default [
   route("api/auth/login", "routes/api/auth.login.tsx"),
   route("api/auth/signup", "routes/api/auth.signup.tsx"),
   route("api/auth/logout", "routes/api/auth.logout.tsx"),
+  route("api/auth/forgot-password", "routes/api/auth.forgot-password.tsx"),
+  route("api/auth/reset-password", "routes/api/auth.reset-password.tsx"),
   route("api/auth/totp/setup", "routes/api/auth.totp.setup.tsx"),
   route("api/auth/totp/enable", "routes/api/auth.totp.enable.tsx"),
   route("api/auth/totp/disable", "routes/api/auth.totp.disable.tsx"),

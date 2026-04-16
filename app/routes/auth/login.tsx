@@ -194,6 +194,11 @@ export default function Login() {
                 <Link to="/auth/sign-up" className="text-primary hover:text-[var(--primary-hover)] font-medium transition-colors">Sign up</Link>
               </p>
             )}
+            {!requires2fa && (
+              <p className="text-center text-sm text-gray-500 mt-3">
+                <Link to="/auth/forgot-password" className="text-gray-400 hover:text-white transition-colors">Forgot your password?</Link>
+              </p>
+            )}
           </div>
         </div>
       </div>
