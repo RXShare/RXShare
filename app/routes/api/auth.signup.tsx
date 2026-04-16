@@ -5,6 +5,7 @@ import { execute, queryOne } from "~/.server/db";
 import { markSetupDone, isFirstRun } from "~/.server/db";
 import { rateLimit } from "~/.server/rate-limit";
 import { validateCsrf } from "~/.server/csrf";
+import { verifyCaptcha } from "~/.server/captcha";
 
 export async function action({ request }: { request: Request }) {
   if (request.method !== "POST") return new Response("Method not allowed", { status: 405 });
@@ -12,6 +13,12 @@ export async function action({ request }: { request: Request }) {
   // CSRF protection
   const csrfError = await validateCsrf(request);
   if (csrfError) return csrfError;
+
+  // CAPTCHA verification (skip during initial setup)
+  if (!isFirstRun()) {
+    const captchaError = await verifyCaptcha(request, "signup");
+    if (captchaError) return captchaError;
+  }
 
   // Rate limit: 5 signups per 30 minutes per IP
   const limited = rateLimit("signup", request, 5, 30 * 60 * 1000);

@@ -9,6 +9,15 @@ export async function loader({ params }: { params: { code: string } }) {
   execute("UPDATE short_links SET clicks = clicks + 1 WHERE id = ?", [link.id]);
   
   if (link.external_url) {
+    // Re-validate external URL at redirect time to prevent open redirect attacks
+    try {
+      const parsed = new URL(link.external_url);
+      if (!["http:", "https:"].includes(parsed.protocol)) {
+        throw new Response("Invalid redirect URL", { status: 400 });
+      }
+    } catch {
+      throw new Response("Invalid redirect URL", { status: 400 });
+    }
     return new Response(null, { status: 302, headers: { Location: link.external_url } });
   }
   

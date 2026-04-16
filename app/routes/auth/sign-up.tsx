@@ -2,6 +2,7 @@ import { useState } from "react";
 import { useNavigate, Link, useLoaderData } from "react-router";
 import { useToast } from "~/components/ui/use-toast";
 import { getCsrfToken } from "~/lib/csrf";
+import { Captcha, useCaptcha } from "~/components/Captcha";
 
 const DEFAULT_LOGO = "https://cdn.rxss.click/rexsystems/logo-transparent.svg";
 
@@ -9,7 +10,7 @@ export async function loader() {
   const { queryOne, isFirstRun } = await import("~/.server/db");
   if (isFirstRun()) return { settings: null };
   try {
-    const settings = queryOne<any>("SELECT site_name, site_description, allow_registration, allow_login, primary_color, accent_color, logo_url, background_pattern FROM system_settings LIMIT 1");
+    const settings = queryOne<any>("SELECT site_name, site_description, allow_registration, allow_login, primary_color, accent_color, logo_url, background_pattern, captcha_provider, captcha_site_key, captcha_on_signup FROM system_settings LIMIT 1");
     return { settings: settings || null };
   } catch {
     return { settings: null };
@@ -28,6 +29,10 @@ export default function SignUp() {
 
   // Read invite code from URL param
   const inviteCode = typeof window !== "undefined" ? new URLSearchParams(window.location.search).get("invite") || "" : "";
+
+  // CAPTCHA
+  const captchaEnabled = settings?.captcha_provider && settings.captcha_provider !== "none" && settings.captcha_site_key && settings.captcha_on_signup;
+  const { captchaToken, onVerify, onExpire } = useCaptcha();
 
   const logo = settings?.logo_url?.trim() || DEFAULT_LOGO;
 
@@ -56,7 +61,7 @@ export default function SignUp() {
     try {
       const res = await fetch("/api/auth/signup", {
         method: "POST", headers: { "Content-Type": "application/json", ...(getCsrfToken() ? { "X-CSRF-Token": getCsrfToken()! } : {}) },
-        body: JSON.stringify({ email, password, username, ...(inviteCode ? { invite_code: inviteCode } : {}) }),
+        body: JSON.stringify({ email, password, username, captchaToken, ...(inviteCode ? { invite_code: inviteCode } : {}) }),
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "Sign up failed");
@@ -110,7 +115,10 @@ export default function SignUp() {
                 <label className="text-sm font-medium text-gray-400">Confirm Password</label>
                 <input type="password" value={confirmPassword} onChange={(e) => setConfirmPassword(e.target.value)} required className={inputCls} />
               </div>
-              <button type="submit" disabled={loading}
+              {captchaEnabled && (
+                <Captcha provider={settings.captcha_provider} siteKey={settings.captcha_site_key} onVerify={onVerify} onExpire={onExpire} />
+              )}
+              <button type="submit" disabled={loading || (captchaEnabled && !captchaToken)}
                 className="w-full bg-primary hover:bg-[var(--primary-hover)] text-white py-3.5 rounded-xl font-bold shadow-glow-primary transition-all hover:scale-[1.02] disabled:opacity-50 relative overflow-hidden text-base">
                 <span className="relative z-10">{loading ? "Creating..." : "Sign Up"}</span>
                 <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/10 to-transparent skew-x-12 translate-x-[-150%] animate-[shimmer_3s_infinite]" />

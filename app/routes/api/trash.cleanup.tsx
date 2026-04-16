@@ -2,8 +2,18 @@ import { getSession } from "~/.server/session";
 import { isAdmin } from "~/.server/auth";
 import { query, execute } from "~/.server/db";
 import { getStorage } from "~/.server/storage";
+import { validateCsrf } from "~/.server/csrf";
+import { rateLimit } from "~/.server/rate-limit";
 
-export async function loader({ request }: { request: Request }) {
+export async function action({ request }: { request: Request }) {
+  if (request.method !== "POST") return new Response("Method not allowed", { status: 405 });
+
+  const csrfError = await validateCsrf(request);
+  if (csrfError) return csrfError;
+
+  const limited = rateLimit("trash-cleanup", request, 5, 10 * 60 * 1000);
+  if (limited) return limited;
+
   const session = await getSession(request);
   if (!session || !isAdmin(session.user.id)) return Response.json({ error: "Forbidden" }, { status: 403 });
 

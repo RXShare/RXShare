@@ -1,12 +1,68 @@
 import { authenticator } from "@otplib/preset-default";
 import crypto from "crypto";
 import QRCode from "qrcode";
+import { nanoid } from "nanoid";
 import { queryOne, execute } from "./db";
 
 // Configure TOTP (6 digits, 30 second window)
 authenticator.options = {
   window: 1, // Allow 1 step before/after (90 second total window)
 };
+
+// In-memory store for TOTP setup sessions (secret + backup codes)
+// These expire after 10 minutes and are cleaned up periodically
+interface TotpSetupSession {
+  userId: string;
+  secret: string;
+  backupCodes: string[];
+  expiresAt: number;
+}
+
+const setupSessions = new Map<string, TotpSetupSession>();
+
+// Clean up expired setup sessions every 5 minutes
+const setupCleanup = setInterval(() => {
+  const now = Date.now();
+  for (const [id, session] of setupSessions) {
+    if (now > session.expiresAt) setupSessions.delete(id);
+  }
+}, 5 * 60 * 1000);
+setupCleanup.unref();
+
+/**
+ * Store TOTP setup secret server-side. Returns a setupId for the client.
+ */
+export function storeTotpSetupSecret(userId: string, secret: string, backupCodes: string[]): string {
+  const setupId = nanoid();
+  setupSessions.set(setupId, {
+    userId,
+    secret,
+    backupCodes,
+    expiresAt: Date.now() + 10 * 60 * 1000, // 10 minutes
+  });
+  return setupId;
+}
+
+/**
+ * Retrieve and validate a TOTP setup session.
+ */
+export function getTotpSetupSecret(setupId: string, userId: string): { secret: string; backupCodes: string[] } | null {
+  const session = setupSessions.get(setupId);
+  if (!session) return null;
+  if (session.userId !== userId) return null;
+  if (Date.now() > session.expiresAt) {
+    setupSessions.delete(setupId);
+    return null;
+  }
+  return { secret: session.secret, backupCodes: session.backupCodes };
+}
+
+/**
+ * Clear a TOTP setup session after successful enable.
+ */
+export function clearTotpSetupSecret(setupId: string): void {
+  setupSessions.delete(setupId);
+}
 
 /**
  * Generate a new TOTP secret for a user

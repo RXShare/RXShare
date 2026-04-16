@@ -147,6 +147,13 @@ export function getMigrationUpdates(): string[] {
     "ALTER TABLE users ADD COLUMN totp_secret TEXT",
     "ALTER TABLE users ADD COLUMN totp_enabled INTEGER DEFAULT 0",
     "ALTER TABLE users ADD COLUMN backup_codes TEXT",
+    // CAPTCHA configuration
+    "ALTER TABLE system_settings ADD COLUMN captcha_provider TEXT DEFAULT 'none'",
+    "ALTER TABLE system_settings ADD COLUMN captcha_site_key TEXT",
+    "ALTER TABLE system_settings ADD COLUMN captcha_secret_key TEXT",
+    "ALTER TABLE system_settings ADD COLUMN captcha_on_login INTEGER DEFAULT 0",
+    "ALTER TABLE system_settings ADD COLUMN captcha_on_signup INTEGER DEFAULT 0",
+    "ALTER TABLE system_settings ADD COLUMN captcha_on_upload INTEGER DEFAULT 0",
   ];
 }
 

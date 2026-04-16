@@ -10,6 +10,7 @@ import { verifyApiToken } from "~/.server/auth";
 import { validateCsrf } from "~/.server/csrf";
 import { logAudit, getClientIp } from "~/.server/audit";
 import { dispatchWebhook } from "~/.server/webhooks";
+import { verifyCaptcha } from "~/.server/captcha";
 
 async function authenticateRequest(request: Request): Promise<{ user: any; isApiToken: boolean } | null> {
   const session = await getSession(request);
@@ -33,6 +34,10 @@ export async function action({ request }: { request: Request }) {
   // CSRF protection (skipped for Bearer token auth)
   const csrfError = await validateCsrf(request);
   if (csrfError) return csrfError;
+
+  // CAPTCHA verification (skipped for Bearer token / API uploads)
+  const captchaError = await verifyCaptcha(request, "upload");
+  if (captchaError) return captchaError;
 
   // Rate limit: 30 uploads per 10 minutes per IP
   const limited = rateLimit("upload", request, 30, 10 * 60 * 1000);

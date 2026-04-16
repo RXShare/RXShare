@@ -30,6 +30,7 @@ export default function AdminPage() {
     { id: "analytics", label: "Analytics", icon: "analytics" },
     { id: "users", label: "Users", icon: "manage_accounts" },
     { id: "settings", label: "General", icon: "settings" },
+    { id: "security", label: "Security", icon: "shield" },
     { id: "design", label: "Design", icon: "palette" },
     { id: "audit", label: "Audit Log", icon: "history" },
     { id: "webhooks", label: "Webhooks", icon: "webhook" },
@@ -68,6 +69,7 @@ export default function AdminPage() {
       {activeTab === "analytics" && <AnalyticsTab users={users} allUploads={allUploads} />}
       {activeTab === "users" && <UsersTab users={users} allUploads={allUploads} currentUserId={currentUserId} toast={toast} revalidator={revalidator} />}
       {activeTab === "settings" && <SettingsTab systemSettings={systemSettings} toast={toast} revalidator={revalidator} />}
+      {activeTab === "security" && <SecurityTab systemSettings={systemSettings} toast={toast} revalidator={revalidator} />}
       {activeTab === "design" && <DesignTab systemSettings={systemSettings} toast={toast} revalidator={revalidator} />}
       {activeTab === "audit" && <AuditTab toast={toast} />}
       {activeTab === "webhooks" && <WebhooksTab toast={toast} />}
@@ -954,6 +956,139 @@ function AnalyticsTab({ users, allUploads }: { users: any[]; allUploads: any[] }
           )}
         </div>
       </div>
+    </div>
+  );
+}
+
+function SecurityTab({ systemSettings, toast, revalidator }: any) {
+  const [provider, setProvider] = useState(systemSettings?.captcha_provider || "none");
+  const [siteKey, setSiteKey] = useState(systemSettings?.captcha_site_key || "");
+  const [secretKey, setSecretKey] = useState(systemSettings?.captcha_secret_key || "");
+  const [onLogin, setOnLogin] = useState(!!systemSettings?.captcha_on_login);
+  const [onSignup, setOnSignup] = useState(!!systemSettings?.captcha_on_signup);
+  const [onUpload, setOnUpload] = useState(!!systemSettings?.captcha_on_upload);
+
+  const providers = [
+    { id: "none", label: "Disabled", icon: "block", desc: "No CAPTCHA verification" },
+    { id: "recaptcha", label: "reCAPTCHA v2", icon: "security", desc: "Google reCAPTCHA" },
+    { id: "turnstile", label: "Turnstile", icon: "shield", desc: "Cloudflare Turnstile" },
+    { id: "hcaptcha", label: "hCaptcha", icon: "verified_user", desc: "hCaptcha" },
+  ];
+
+  const docsUrl: Record<string, string> = {
+    recaptcha: "https://www.google.com/recaptcha/admin",
+    turnstile: "https://dash.cloudflare.com/?to=/:account/turnstile",
+    hcaptcha: "https://dashboard.hcaptcha.com/signup",
+  };
+
+  const save = async () => {
+    if (provider !== "none" && (!siteKey.trim() || !secretKey.trim())) {
+      toast({ title: "Site Key and Secret Key are required", variant: "destructive" });
+      return;
+    }
+    const res = await fetch("/api/admin/system-settings", {
+      method: "PUT",
+      headers: { "Content-Type": "application/json", ...(getCsrfToken() ? { "X-CSRF-Token": getCsrfToken()! } : {}) },
+      body: JSON.stringify({
+        captcha_provider: provider,
+        captcha_site_key: provider !== "none" ? siteKey.trim() : null,
+        captcha_secret_key: provider !== "none" ? secretKey.trim() : null,
+        captcha_on_login: onLogin ? 1 : 0,
+        captcha_on_signup: onSignup ? 1 : 0,
+        captcha_on_upload: onUpload ? 1 : 0,
+      }),
+    });
+    if (res.ok) { revalidator.revalidate(); toast({ title: "Security settings saved!" }); }
+    else toast({ title: "Failed to save", variant: "destructive" });
+  };
+
+  const inputCls = "block w-full px-4 py-2.5 border border-white/10 rounded-lg bg-[#0a0a0a] text-gray-300 placeholder-gray-600 focus:outline-none focus:ring-1 focus:ring-primary focus:border-primary text-sm transition-all";
+
+  return (
+    <div className="mt-6 max-w-xl space-y-6">
+      <section className="bg-[#141414] border border-white/5 rounded-2xl p-8 shadow-glow-card space-y-6">
+        <h3 className="text-xl font-bold text-white flex items-center gap-2">
+          <span className="w-1 h-6 bg-primary rounded-full" /> CAPTCHA Protection
+        </h3>
+        <p className="text-sm text-gray-400">
+          Protect forms from bots and abuse. Choose a CAPTCHA provider and configure where it should be enforced.
+          API token requests (ShareX, etc.) bypass CAPTCHA automatically.
+        </p>
+
+        {/* Provider selection */}
+        <div className="grid grid-cols-2 gap-3">
+          {providers.map((p) => (
+            <button key={p.id} onClick={() => setProvider(p.id)}
+              className={cn(
+                "p-4 rounded-xl border text-left transition-all",
+                provider === p.id
+                  ? "border-primary bg-primary/10 shadow-glow-primary"
+                  : "border-white/10 bg-[#0a0a0a] hover:border-white/20"
+              )}>
+              <div className="flex items-center gap-3 mb-1">
+                <Icon name={p.icon} className={cn("text-xl", provider === p.id ? "text-primary" : "text-gray-500")} />
+                <span className={cn("font-bold text-sm", provider === p.id ? "text-white" : "text-gray-300")}>{p.label}</span>
+              </div>
+              <p className="text-xs text-gray-500">{p.desc}</p>
+            </button>
+          ))}
+        </div>
+
+        {/* Keys */}
+        {provider !== "none" && (
+          <div className="space-y-4 animate-in fade-in duration-200">
+            {docsUrl[provider] && (
+              <p className="text-xs text-gray-500">
+                Get your keys from{" "}
+                <a href={docsUrl[provider]} target="_blank" rel="noopener noreferrer" className="text-primary hover:underline">
+                  {provider === "recaptcha" ? "Google reCAPTCHA Admin" : provider === "turnstile" ? "Cloudflare Dashboard" : "hCaptcha Dashboard"}
+                </a>
+              </p>
+            )}
+            <div className="space-y-2">
+              <label className="text-sm font-medium text-gray-400">Site Key</label>
+              <input value={siteKey} onChange={(e) => setSiteKey(e.target.value)} className={inputCls} placeholder="Enter site key" />
+            </div>
+            <div className="space-y-2">
+              <label className="text-sm font-medium text-gray-400">Secret Key</label>
+              <input type="password" value={secretKey} onChange={(e) => setSecretKey(e.target.value)} className={inputCls} placeholder="Enter secret key" />
+            </div>
+
+            <div className="h-px bg-white/5" />
+
+            {/* Enforcement toggles */}
+            <div className="space-y-4">
+              <p className="text-sm font-medium text-gray-300">Enforce CAPTCHA on:</p>
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-sm text-white">Login</p>
+                  <p className="text-xs text-gray-500">Protect against credential stuffing</p>
+                </div>
+                <Switch checked={onLogin} onCheckedChange={setOnLogin} />
+              </div>
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-sm text-white">Sign Up</p>
+                  <p className="text-xs text-gray-500">Prevent automated account creation</p>
+                </div>
+                <Switch checked={onSignup} onCheckedChange={setOnSignup} />
+              </div>
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-sm text-white">File Upload</p>
+                  <p className="text-xs text-gray-500">Block automated uploads (API tokens bypass this)</p>
+                </div>
+                <Switch checked={onUpload} onCheckedChange={setOnUpload} />
+              </div>
+            </div>
+          </div>
+        )}
+
+        <button onClick={save}
+          className="bg-primary hover:bg-[var(--primary-hover)] text-white px-8 py-3 rounded-xl font-bold shadow-glow-primary transition-all hover:scale-105 flex items-center gap-2">
+          Save Security Settings
+        </button>
+      </section>
     </div>
   );
 }

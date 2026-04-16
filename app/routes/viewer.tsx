@@ -51,7 +51,7 @@ export async function loader({ params, request }: { params: { fileName: string }
     execute("UPDATE uploads SET views = views + 1 WHERE id = ?", [upload.id]);
     upload.views = (upload.views || 0) + 1;
     // Set a cookie that expires in 1 hour to prevent re-counting
-    setCookieHeader = `${viewedKey}=1; Path=/v/${params.fileName}; Max-Age=3600; HttpOnly; SameSite=Lax`;
+    setCookieHeader = `${viewedKey}=1; Path=/v/${params.fileName}; Max-Age=3600; HttpOnly; SameSite=Lax${process.env.NODE_ENV === "production" ? "; Secure" : ""}`;
   }
 
   const baseUrl = getBaseUrl(request);

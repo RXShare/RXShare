@@ -60,7 +60,12 @@ export async function action({ request }: { request: Request }) {
   if (request.method === "PATCH") {
     const { id, is_active, events } = await request.json();
     if (is_active !== undefined) execute("UPDATE webhooks SET is_active = ? WHERE id = ?", [is_active ? 1 : 0, id]);
-    if (events !== undefined) execute("UPDATE webhooks SET events = ? WHERE id = ?", [events, id]);
+    if (events !== undefined) {
+      // Validate events are known values
+      const validEvents = ["upload", "delete", "login", "signup", "user.create", "user.delete", "*"];
+      const eventList = String(events).split(",").map((e: string) => e.trim()).filter((e: string) => validEvents.includes(e));
+      if (eventList.length > 0) execute("UPDATE webhooks SET events = ? WHERE id = ?", [eventList.join(","), id]);
+    }
     logAudit("webhook.update", { userId: session.user.id, targetType: "webhook", targetId: id, ip: getClientIp(request) });
     return Response.json({ ok: true });
   }

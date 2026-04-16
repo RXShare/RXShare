@@ -29,7 +29,7 @@ export async function action({ request }: { request: Request }) {
   const sys = queryOne<any>("SELECT id FROM system_settings LIMIT 1");
   if (!sys) return Response.json({ error: "No system settings" }, { status: 500 });
 
-  const allowed = ["site_name", "site_description", "base_url", "allow_registration", "allow_login", "allow_email", "default_quota", "max_upload_size", "primary_color", "accent_color", "dashboard_layout", "logo_url", "background_pattern"];
+  const allowed = ["site_name", "site_description", "base_url", "allow_registration", "allow_login", "allow_email", "default_quota", "max_upload_size", "primary_color", "accent_color", "dashboard_layout", "logo_url", "background_pattern", "captcha_provider", "captcha_site_key", "captcha_secret_key", "captcha_on_login", "captcha_on_signup", "captcha_on_upload"];
   const colorFields = ["primary_color", "accent_color"];
   const sets: string[] = [];
   const vals: any[] = [];
@@ -43,6 +43,10 @@ export async function action({ request }: { request: Request }) {
       }
       // Sanitize string values — strip control chars
       if (typeof val === "string") val = val.replace(/[\x00-\x08\x0B\x0C\x0E-\x1F]/g, "");
+      // Validate captcha_provider enum
+      if (key === "captcha_provider" && typeof val === "string") {
+        if (!["none", "recaptcha", "turnstile", "hcaptcha"].includes(val)) continue;
+      }
       sets.push(`${key} = ?`);
       vals.push(val);
     }

@@ -1,9 +1,9 @@
-import { nanoid } from "nanoid";
 import { queryOne, execute } from "~/.server/db";
 import { verifyTotpToken, verifyBackupCode, getTotpSecret } from "~/.server/totp";
 import { generateToken } from "~/.server/auth";
 import { createSessionHeaders } from "~/.server/session";
 import { validateCsrf } from "~/.server/csrf";
+import { rateLimit } from "~/.server/rate-limit";
 import { logAudit, getClientIp } from "~/.server/audit";
 
 /**
@@ -14,6 +14,10 @@ export async function action({ request }: { request: Request }) {
 
   const csrfError = await validateCsrf(request);
   if (csrfError) return csrfError;
+
+  // Rate limit: 5 attempts per 5 minutes per IP to prevent brute-force on TOTP codes
+  const limited = rateLimit("totp-verify", request, 5, 5 * 60 * 1000);
+  if (limited) return limited;
 
   const body = await request.json();
   const { sessionId, token: userToken, useBackupCode } = body;

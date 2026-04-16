@@ -28,6 +28,12 @@ export async function action({ request, params }: { request: Request; params: { 
     execute("UPDATE uploads SET is_public = ?, updated_at = ? WHERE id = ?", [body.is_public ? 1 : 0, now, params.id]);
   }
   if (body.expires_at !== undefined) {
+    // Validate expires_at is either null or a valid ISO date string in the future
+    if (body.expires_at !== null) {
+      const parsed = new Date(body.expires_at);
+      if (isNaN(parsed.getTime())) return Response.json({ error: "Invalid expiration date" }, { status: 400 });
+      if (parsed < new Date()) return Response.json({ error: "Expiration date must be in the future" }, { status: 400 });
+    }
     execute("UPDATE uploads SET expires_at = ?, updated_at = ? WHERE id = ?", [body.expires_at, now, params.id]);
   }
   if (body.password !== undefined) {
@@ -38,7 +44,11 @@ export async function action({ request, params }: { request: Request; params: { 
     execute("UPDATE uploads SET folder_id = ?, updated_at = ? WHERE id = ?", [body.folder_id, now, params.id]);
   }
   if (body.description !== undefined) {
-    execute("UPDATE uploads SET description = ?, updated_at = ? WHERE id = ?", [body.description || null, now, params.id]);
+    // Sanitize description — strip control chars, limit length
+    const desc = typeof body.description === "string"
+      ? body.description.replace(/[\x00-\x08\x0B\x0C\x0E-\x1F]/g, "").slice(0, 500) || null
+      : null;
+    execute("UPDATE uploads SET description = ?, updated_at = ? WHERE id = ?", [desc, now, params.id]);
   }
   return Response.json({ ok: true });
 }

@@ -6,6 +6,7 @@ import { validateCsrf } from "~/.server/csrf";
 import { queryOne, execute } from "~/.server/db";
 import { isTotpEnabled } from "~/.server/totp";
 import { logAudit, getClientIp } from "~/.server/audit";
+import { verifyCaptcha } from "~/.server/captcha";
 
 export async function action({ request }: { request: Request }) {
   if (request.method !== "POST") return new Response("Method not allowed", { status: 405 });
@@ -13,6 +14,10 @@ export async function action({ request }: { request: Request }) {
   // CSRF protection
   const csrfError = await validateCsrf(request);
   if (csrfError) return csrfError;
+
+  // CAPTCHA verification
+  const captchaError = await verifyCaptcha(request, "login");
+  if (captchaError) return captchaError;
 
   // Rate limit: 10 login attempts per 15 minutes per IP
   const limited = rateLimit("login", request, 10, 15 * 60 * 1000);

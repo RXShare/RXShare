@@ -1,7 +1,8 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useNavigate, Link, useLoaderData } from "react-router";
 import { useToast } from "~/components/ui/use-toast";
 import { getCsrfToken } from "~/lib/csrf";
+import { Captcha, useCaptcha } from "~/components/Captcha";
 
 const DEFAULT_LOGO = "https://cdn.rxss.click/rexsystems/logo-transparent.svg";
 
@@ -9,7 +10,7 @@ export async function loader() {
   const { queryOne, isFirstRun } = await import("~/.server/db");
   if (isFirstRun()) return { settings: null };
   try {
-    const settings = queryOne<any>("SELECT site_name, site_description, allow_registration, allow_login, primary_color, accent_color, logo_url, background_pattern FROM system_settings LIMIT 1");
+    const settings = queryOne<any>("SELECT site_name, site_description, allow_registration, allow_login, primary_color, accent_color, logo_url, background_pattern, captcha_provider, captcha_site_key, captcha_on_login FROM system_settings LIMIT 1");
     return { settings: settings || null };
   } catch {
     return { settings: null };
@@ -29,6 +30,10 @@ export default function Login() {
   const [sessionId, setSessionId] = useState("");
   const [totpCode, setTotpCode] = useState("");
   const [useBackupCode, setUseBackupCode] = useState(false);
+
+  // CAPTCHA
+  const captchaEnabled = settings?.captcha_provider && settings.captcha_provider !== "none" && settings.captcha_site_key && settings.captcha_on_login;
+  const { captchaToken, onVerify, onExpire } = useCaptcha();
 
   const logo = settings?.logo_url?.trim() || DEFAULT_LOGO;
 
@@ -53,7 +58,7 @@ export default function Login() {
     try {
       const res = await fetch("/api/auth/login", {
         method: "POST", headers: { "Content-Type": "application/json", ...(getCsrfToken() ? { "X-CSRF-Token": getCsrfToken()! } : {}) },
-        body: JSON.stringify({ email, password }),
+        body: JSON.stringify({ email, password, captchaToken }),
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "Login failed");
@@ -122,7 +127,10 @@ export default function Login() {
                     className="block w-full px-4 py-3.5 border border-white/10 rounded-xl bg-[#0a0a0a] text-gray-300 placeholder-gray-600 focus:outline-none focus:ring-1 focus:ring-primary focus:border-primary text-sm transition-all shadow-[inset_0_1px_0_0_rgba(255,255,255,0.05)]"
                     placeholder="••••••••" />
                 </div>
-                <button type="submit" disabled={loading}
+                {captchaEnabled && (
+                  <Captcha provider={settings.captcha_provider} siteKey={settings.captcha_site_key} onVerify={onVerify} onExpire={onExpire} />
+                )}
+                <button type="submit" disabled={loading || (captchaEnabled && !captchaToken)}
                   className="w-full bg-primary hover:bg-[var(--primary-hover)] text-white py-3.5 rounded-xl font-bold shadow-glow-primary transition-all hover:scale-[1.02] disabled:opacity-50 disabled:hover:scale-100 relative overflow-hidden text-base">
                   <span className="relative z-10">{loading ? "Signing in..." : "Sign In"}</span>
                   <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/10 to-transparent skew-x-12 translate-x-[-150%] animate-[shimmer_3s_infinite]" />
