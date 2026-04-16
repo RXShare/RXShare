@@ -729,17 +729,28 @@ function AnalyticsTab({ users, allUploads }: { users: any[]; allUploads: any[] }
   const [data, setData] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [rc, setRc] = useState<any>(null);
+  const [range, setRange] = useState("month");
 
-  useEffect(() => {
-    fetch("/api/admin/analytics")
-      .then((r) => r.json())
+  const fetchData = (r: string) => {
+    setLoading(true);
+    fetch(`/api/admin/analytics?range=${r}`)
+      .then((res) => res.json())
       .then((d) => setData(d))
       .catch(() => {})
       .finally(() => setLoading(false));
+  };
+
+  useEffect(() => {
+    fetchData(range);
     import("recharts").then(setRc);
   }, []);
 
-  if (loading || !rc) {
+  const handleRangeChange = (r: string) => {
+    setRange(r);
+    fetchData(r);
+  };
+
+  if (!rc || (!data && loading)) {
     return (
       <div className="mt-6 flex items-center justify-center py-20">
         <Icon name="progress_activity" className="text-4xl text-primary animate-spin" />
@@ -748,25 +759,48 @@ function AnalyticsTab({ users, allUploads }: { users: any[]; allUploads: any[] }
   }
 
   if (!data) {
-    return (
-      <div className="mt-6 text-center py-20 text-gray-500">
-        Failed to load analytics data.
-      </div>
-    );
+    return <div className="mt-6 text-center py-20 text-gray-500">Failed to load analytics data.</div>;
   }
 
-  const {
-    AreaChart, Area, BarChart, Bar, PieChart, Pie, Cell,
-    XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
-  } = rc;
-
+  const { AreaChart, Area, BarChart, Bar, PieChart, Pie, Cell, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } = rc;
   const COLORS = ["#f97316", "#3b82f6", "#8b5cf6", "#22c55e", "#ec4899"];
 
-  const uploadsPerDay = data.uploadsPerDay || [];
+  // Fill gaps so the chart shows zero for days with no uploads
+  const rawUploads: { date: string; count: number; size: number }[] = data.uploadsPerDay || [];
+  const fillDays = (raw: typeof rawUploads): typeof rawUploads => {
+    const numDays = range === "day" ? 1 : range === "week" ? 7 : range === "month" ? 30 : 0;
+    if (raw.length === 0 && numDays > 0) {
+      const result: typeof rawUploads = [];
+      const now = new Date();
+      for (let i = numDays - 1; i >= 0; i--) {
+        const d = new Date(now); d.setDate(d.getDate() - i);
+        result.push({ date: d.toISOString().slice(0, 10), count: 0, size: 0 });
+      }
+      return result;
+    }
+    if (raw.length === 0) return raw;
+    if (range === "lifetime") {
+      const first = new Date(raw[0].date); const last = new Date(raw[raw.length - 1].date);
+      if (Math.ceil((last.getTime() - first.getTime()) / 86400000) > 365) return raw;
+    }
+    const map = new Map(raw.map((d) => [d.date, d]));
+    const sorted = [...raw].sort((a, b) => a.date.localeCompare(b.date));
+    const start = numDays > 0 ? new Date(Date.now() - numDays * 86400000) : new Date(sorted[0].date);
+    const end = new Date(); end.setHours(0, 0, 0, 0);
+    const result: typeof rawUploads = [];
+    const cursor = new Date(start); cursor.setHours(0, 0, 0, 0);
+    while (cursor <= end) {
+      const key = cursor.toISOString().slice(0, 10);
+      result.push(map.get(key) || { date: key, count: 0, size: 0 });
+      cursor.setDate(cursor.getDate() + 1);
+    }
+    return result;
+  };
+
+  const uploadsPerDay = fillDays(rawUploads);
   const topUploaders = data.topUploaders || [];
   const typeDistribution = data.typeDistribution || [];
 
-  // Aggregate mime types into categories
   const typeCategories: Record<string, number> = {};
   typeDistribution.forEach((t: any) => {
     const mime = (t.mime_type || "").toLowerCase();
@@ -778,16 +812,8 @@ function AnalyticsTab({ users, allUploads }: { users: any[]; allUploads: any[] }
     typeCategories[cat] = (typeCategories[cat] || 0) + t.count;
   });
   const pieData = Object.entries(typeCategories).map(([name, value]) => ({ name, value }));
-
-  // Stats for this month
-  const now = new Date();
-  const monthStart = new Date(now.getFullYear(), now.getMonth(), 1).toISOString().slice(0, 10);
-  const uploadsThisMonth = uploadsPerDay
-    .filter((d: any) => d.date >= monthStart)
-    .reduce((acc: number, d: any) => acc + d.count, 0);
-  const storageThisMonth = uploadsPerDay
-    .filter((d: any) => d.date >= monthStart)
-    .reduce((acc: number, d: any) => acc + (d.size || 0), 0);
+  const rangeUploads = uploadsPerDay.reduce((acc: number, d: any) => acc + d.count, 0);
+  const rangeStorage = uploadsPerDay.reduce((acc: number, d: any) => acc + (d.size || 0), 0);
 
   const CustomTooltip = ({ active, payload, label }: any) => {
     if (!active || !payload?.length) return null;
@@ -803,14 +829,30 @@ function AnalyticsTab({ users, allUploads }: { users: any[]; allUploads: any[] }
     );
   };
 
+  const rangeLabels: Record<string, string> = { day: "Today", week: "This Week", month: "This Month", lifetime: "All Time" };
+  const rangeLabel = rangeLabels[range] || "This Month";
+  const RangeDropdown = ({ value, onChange }: { value: string; onChange: (v: string) => void }) => (
+    <select value={value} onChange={(e) => onChange(e.target.value)}
+      className="text-xs bg-[#0a0a0a] border border-white/10 rounded-lg px-2 py-1.5 text-gray-400 focus:outline-none focus:ring-1 focus:ring-primary cursor-pointer">
+      <option value="day">Today</option>
+      <option value="week">This Week</option>
+      <option value="month">This Month</option>
+      <option value="lifetime">All Time</option>
+    </select>
+  );
+
   const totalUsers = users.length;
   const activeUsersCount = users.filter((u: any) => u.is_active !== 0).length;
   const totalUploadsCount = allUploads.length;
   const totalStorageUsed = users.reduce((acc: number, u: any) => acc + (u.disk_used || 0), 0);
+  const formatXTick = (v: string) => {
+    if (range === "lifetime" && uploadsPerDay.length > 60) return v.slice(0, 7);
+    return v.slice(5);
+  };
+  const xInterval = uploadsPerDay.length > 14 ? Math.floor(uploadsPerDay.length / 7) : 0;
 
   return (
     <div className="mt-6 space-y-6">
-      {/* Admin stat cards (moved from header) */}
       <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-6">
         {[
           { icon: "group", label: "Total Users", value: String(totalUsers), color: "text-primary" },
@@ -819,99 +861,78 @@ function AnalyticsTab({ users, allUploads }: { users: any[]; allUploads: any[] }
           { icon: "storage", label: "Storage Used", value: formatFileSize(totalStorageUsed), color: "text-purple-500" },
         ].map((stat) => (
           <div key={stat.label} className="bg-[#141414]/50 backdrop-blur-md border border-white/5 p-6 rounded-2xl relative overflow-hidden group hover:border-primary/30 transition-all duration-300 shadow-glow-card">
-            <div className="absolute top-0 right-0 p-4 opacity-10 group-hover:opacity-20 transition-opacity">
-              <Icon name={stat.icon} className={cn("text-6xl", stat.color)} />
-            </div>
+            <div className="absolute top-0 right-0 p-4 opacity-10 group-hover:opacity-20 transition-opacity"><Icon name={stat.icon} className={cn("text-6xl", stat.color)} /></div>
             <div className="text-gray-400 text-sm font-medium mb-2">{stat.label}</div>
             <div className="text-3xl font-bold text-white tracking-tight">{stat.value}</div>
-            <div className="flex items-center gap-1 text-emerald-500 text-xs mt-2 font-medium">
-              <Icon name="trending_up" className="text-sm" />
-              <span>Active</span>
-            </div>
           </div>
         ))}
       </div>
-
-      {/* Analytics stat cards */}
       <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-6">
         {[
-          { icon: "visibility", label: "Total Views", value: (data.totalViews ?? 0).toLocaleString(), color: "text-primary" },
-          { icon: "download", label: "Total Downloads", value: (data.totalDownloads ?? 0).toLocaleString(), color: "text-blue-500" },
-          { icon: "cloud_upload", label: "Uploads This Month", value: String(uploadsThisMonth), color: "text-purple-500" },
-          { icon: "storage", label: "Storage This Month", value: formatFileSize(storageThisMonth), color: "text-green-500" },
+          { icon: "visibility", label: "Views", value: (data.totalViews ?? 0).toLocaleString(), color: "text-primary" },
+          { icon: "download", label: "Downloads", value: (data.totalDownloads ?? 0).toLocaleString(), color: "text-blue-500" },
+          { icon: "cloud_upload", label: "Uploads", value: String(rangeUploads), color: "text-purple-500" },
+          { icon: "storage", label: "Storage Added", value: formatFileSize(rangeStorage), color: "text-green-500" },
         ].map((stat) => (
           <div key={stat.label} className="bg-[#141414]/50 backdrop-blur-md border border-white/5 p-6 rounded-2xl relative overflow-hidden group hover:border-primary/30 transition-all duration-300 shadow-glow-card">
-            <div className="absolute top-0 right-0 p-4 opacity-10 group-hover:opacity-20 transition-opacity">
-              <Icon name={stat.icon} className={cn("text-6xl", stat.color)} />
+            <div className="absolute top-0 right-0 p-4 opacity-10 group-hover:opacity-20 transition-opacity"><Icon name={stat.icon} className={cn("text-6xl", stat.color)} /></div>
+            <div className="flex items-center justify-between mb-2">
+              <span className="text-gray-400 text-sm font-medium">{stat.label}</span>
+              <span className="text-[10px] text-gray-500 bg-white/5 px-2 py-0.5 rounded-full">{rangeLabel}</span>
             </div>
-            <div className="text-gray-400 text-sm font-medium mb-2">{stat.label}</div>
             <div className="text-3xl font-bold text-white tracking-tight">{stat.value}</div>
-            <div className="flex items-center gap-1 text-emerald-500 text-xs mt-2 font-medium">
-              <Icon name="trending_up" className="text-sm" />
-              <span>Active</span>
-            </div>
           </div>
         ))}
       </div>
-
-      {/* Charts row */}
       <div className="grid grid-cols-1 xl:grid-cols-2 gap-6">
-        {/* Uploads per day area chart */}
         <div className="bg-[#141414] border border-white/5 rounded-2xl p-8 shadow-glow-card">
-          <h3 className="text-lg font-bold text-white mb-6 flex items-center gap-2">
-            <span className="w-1 h-5 bg-primary rounded-full" /> Uploads Per Day
-          </h3>
-          <ResponsiveContainer width="100%" height={280}>
-            <AreaChart data={uploadsPerDay}>
-              <defs>
-                <linearGradient id="uploadGrad" x1="0" y1="0" x2="0" y2="1">
-                  <stop offset="5%" stopColor="#f97316" stopOpacity={0.3} />
-                  <stop offset="95%" stopColor="#f97316" stopOpacity={0} />
-                </linearGradient>
-              </defs>
-              <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.05)" />
-              <XAxis dataKey="date" tick={{ fill: "#6b7280", fontSize: 11 }} tickFormatter={(v: string) => v.slice(5)} />
-              <YAxis tick={{ fill: "#6b7280", fontSize: 11 }} allowDecimals={false} />
-              <Tooltip content={<CustomTooltip />} />
-              <Area type="monotone" dataKey="count" name="Uploads" stroke="#f97316" fill="url(#uploadGrad)" strokeWidth={2} />
-            </AreaChart>
-          </ResponsiveContainer>
+          <div className="flex items-center justify-between mb-6">
+            <h3 className="text-lg font-bold text-white flex items-center gap-2"><span className="w-1 h-5 bg-primary rounded-full" /> Uploads</h3>
+            <RangeDropdown value={range} onChange={handleRangeChange} />
+          </div>
+          {uploadsPerDay.length === 0 ? <div className="flex items-center justify-center h-[280px] text-gray-500 text-sm">No data for this period</div> : (
+            <ResponsiveContainer width="100%" height={280}>
+              <AreaChart data={uploadsPerDay}>
+                <defs><linearGradient id="uploadGrad" x1="0" y1="0" x2="0" y2="1"><stop offset="5%" stopColor="#f97316" stopOpacity={0.3} /><stop offset="95%" stopColor="#f97316" stopOpacity={0} /></linearGradient></defs>
+                <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.05)" />
+                <XAxis dataKey="date" tick={{ fill: "#6b7280", fontSize: 11 }} tickFormatter={formatXTick} interval={xInterval} />
+                <YAxis tick={{ fill: "#6b7280", fontSize: 11 }} allowDecimals={false} />
+                <Tooltip content={<CustomTooltip />} />
+                <Area type="monotone" dataKey="count" name="Uploads" stroke="#f97316" fill="url(#uploadGrad)" strokeWidth={2} />
+              </AreaChart>
+            </ResponsiveContainer>
+          )}
         </div>
-
-        {/* Storage growth bar chart */}
         <div className="bg-[#141414] border border-white/5 rounded-2xl p-8 shadow-glow-card">
-          <h3 className="text-lg font-bold text-white mb-6 flex items-center gap-2">
-            <span className="w-1 h-5 bg-blue-500 rounded-full" /> Storage Growth Per Day
-          </h3>
-          <ResponsiveContainer width="100%" height={280}>
-            <BarChart data={uploadsPerDay}>
-              <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.05)" />
-              <XAxis dataKey="date" tick={{ fill: "#6b7280", fontSize: 11 }} tickFormatter={(v: string) => v.slice(5)} />
-              <YAxis tick={{ fill: "#6b7280", fontSize: 11 }} tickFormatter={(v: number) => formatFileSize(v)} />
-              <Tooltip content={<CustomTooltip />} />
-              <Bar dataKey="size" name="Storage" fill="#3b82f6" radius={[4, 4, 0, 0]} />
-            </BarChart>
-          </ResponsiveContainer>
+          <div className="flex items-center justify-between mb-6">
+            <h3 className="text-lg font-bold text-white flex items-center gap-2"><span className="w-1 h-5 bg-blue-500 rounded-full" /> Storage Growth</h3>
+            <RangeDropdown value={range} onChange={handleRangeChange} />
+          </div>
+          {uploadsPerDay.length === 0 ? <div className="flex items-center justify-center h-[280px] text-gray-500 text-sm">No data for this period</div> : (
+            <ResponsiveContainer width="100%" height={280}>
+              <BarChart data={uploadsPerDay}>
+                <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.05)" />
+                <XAxis dataKey="date" tick={{ fill: "#6b7280", fontSize: 11 }} tickFormatter={formatXTick} interval={xInterval} />
+                <YAxis tick={{ fill: "#6b7280", fontSize: 11 }} tickFormatter={(v: number) => formatFileSize(v)} />
+                <Tooltip content={<CustomTooltip />} />
+                <Bar dataKey="size" name="Storage" fill="#3b82f6" radius={[4, 4, 0, 0]} />
+              </BarChart>
+            </ResponsiveContainer>
+          )}
         </div>
       </div>
-
-      {/* Bottom row */}
       <div className="grid grid-cols-1 xl:grid-cols-2 gap-6">
-        {/* Top uploaders */}
         <div className="bg-[#141414] border border-white/5 rounded-2xl p-8 shadow-glow-card">
-          <h3 className="text-lg font-bold text-white mb-6 flex items-center gap-2">
-            <span className="w-1 h-5 bg-purple-500 rounded-full" /> Top Uploaders
-          </h3>
-          {topUploaders.length === 0 ? (
-            <p className="text-gray-500 text-sm">No upload data yet.</p>
-          ) : (
+          <div className="flex items-center justify-between mb-6">
+            <h3 className="text-lg font-bold text-white flex items-center gap-2"><span className="w-1 h-5 bg-purple-500 rounded-full" /> Top Uploaders</h3>
+            <span className="text-[10px] text-gray-500 bg-white/5 px-2 py-0.5 rounded-full">{rangeLabel}</span>
+          </div>
+          {topUploaders.length === 0 ? <p className="text-gray-500 text-sm">No upload data for this period.</p> : (
             <div className="space-y-3">
               {topUploaders.map((u: any, i: number) => (
                 <div key={u.username} className="flex items-center justify-between py-2 border-b border-white/5 last:border-0">
                   <div className="flex items-center gap-3">
-                    <span className="w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold" style={{ backgroundColor: COLORS[i % COLORS.length] + "20", color: COLORS[i % COLORS.length] }}>
-                      {i + 1}
-                    </span>
+                    <span className="w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold" style={{ backgroundColor: COLORS[i % COLORS.length] + "20", color: COLORS[i % COLORS.length] }}>{i + 1}</span>
                     <span className="text-white font-medium text-sm">{u.username}</span>
                   </div>
                   <div className="text-right">
@@ -923,22 +944,17 @@ function AnalyticsTab({ users, allUploads }: { users: any[]; allUploads: any[] }
             </div>
           )}
         </div>
-
-        {/* File type distribution pie chart */}
         <div className="bg-[#141414] border border-white/5 rounded-2xl p-8 shadow-glow-card">
-          <h3 className="text-lg font-bold text-white mb-6 flex items-center gap-2">
-            <span className="w-1 h-5 bg-green-500 rounded-full" /> File Type Distribution
-          </h3>
-          {pieData.length === 0 ? (
-            <p className="text-gray-500 text-sm">No upload data yet.</p>
-          ) : (
+          <div className="flex items-center justify-between mb-6">
+            <h3 className="text-lg font-bold text-white flex items-center gap-2"><span className="w-1 h-5 bg-green-500 rounded-full" /> File Types</h3>
+            <span className="text-[10px] text-gray-500 bg-white/5 px-2 py-0.5 rounded-full">{rangeLabel}</span>
+          </div>
+          {pieData.length === 0 ? <p className="text-gray-500 text-sm">No upload data for this period.</p> : (
             <div className="flex items-center gap-6">
               <ResponsiveContainer width="60%" height={220}>
                 <PieChart>
                   <Pie data={pieData} cx="50%" cy="50%" innerRadius={50} outerRadius={80} paddingAngle={3} dataKey="value">
-                    {pieData.map((_: any, i: number) => (
-                      <Cell key={i} fill={COLORS[i % COLORS.length]} />
-                    ))}
+                    {pieData.map((_: any, i: number) => <Cell key={i} fill={COLORS[i % COLORS.length]} />)}
                   </Pie>
                   <Tooltip contentStyle={{ backgroundColor: "#1a1a1a", border: "1px solid rgba(255,255,255,0.1)", borderRadius: "8px", fontSize: "12px" }} />
                 </PieChart>
